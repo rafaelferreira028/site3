@@ -1378,8 +1378,9 @@ function showConfirm(message, onConfirm) {
   const msgEl = document.getElementById('confirm-msg');
   if (!modal || !msgEl) return;
 
-  msgEl.textContent = message;
+  msgEl.innerHTML = message;
   modal.classList.remove('hidden');
+  if (window.lucide) window.lucide.createIcons({ root: modal });
   confirmCallback = onConfirm;
 }
 
@@ -1404,7 +1405,8 @@ function showConfirmDeleteDay(dayId) {
   if (!day) return;
   
   const formattedDate = formatDate(day.date);
-  showConfirm(`Tem certeza que deseja excluir o dia ${formattedDate} e remover todas as suas apostas associadas?`, () => {
+  const betText = (day.bets || []).length === 1 ? '1 aposta' : `${(day.bets || []).length} apostas`;
+  showConfirm(`Tem certeza que deseja excluir a sessão do dia <strong class="text-rose-400 font-bold">${formattedDate}</strong>?<br><br>Todas as <strong class="text-slate-100 font-semibold">${betText}</strong> desta sessão serão removidas permanentemente.`, () => {
     trackerData.days = trackerData.days.filter(d => d.id !== dayId);
     saveData();
 
@@ -1444,7 +1446,10 @@ function showConfirmDeleteDateGroup(dateKey) {
     totalBetsCount += (s.bets || []).length;
   });
 
-  showConfirm(`Tem certeza que deseja excluir TODO o dia ${formattedDate}? Isso apagará permanentemente todas as ${matchingSessions.length} sessões (${totalBetsCount} apostas) deste dia.`, () => {
+  const sessionText = matchingSessions.length === 1 ? '1 sessão' : `${matchingSessions.length} sessões`;
+  const betText = totalBetsCount === 1 ? '1 aposta' : `${totalBetsCount} apostas`;
+
+  showConfirm(`Tem certeza que deseja excluir <strong>TODO o dia <span class="text-rose-400 font-bold">${formattedDate}</span></strong>?<br><br>Esta ação apagará permanentemente todas as <strong class="text-slate-100 font-semibold">${sessionText} (${betText})</strong> deste dia.`, () => {
     trackerData.days = trackerData.days.filter(d => (d.date || '') !== dateKey);
     saveData();
     renderAllDays();
@@ -1459,8 +1464,8 @@ function showConfirmDeleteBet(dayId, betId) {
   const bet = day.bets.find(b => b.id === betId);
   if (!bet) return;
 
-  const desc = bet.bookmaker ? ` "${bet.bookmaker}"` : ' esta aposta';
-  showConfirm(`Tem certeza que deseja excluir a aposta${desc}?`, () => {
+  const desc = bet.bookmaker ? `<strong class="text-indigo-300 font-semibold">"${bet.bookmaker}"</strong>` : 'esta aposta';
+  showConfirm(`Tem certeza que deseja excluir a aposta ${desc}?`, () => {
     day.bets = day.bets.filter(b => b.id !== betId);
     saveData();
 

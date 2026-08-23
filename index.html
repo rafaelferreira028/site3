@@ -955,32 +955,42 @@
 
   <!-- Custom Alert/Confirmation Dialog -->
   <div id="modal-confirm"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" role="dialog"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-all duration-300" role="dialog"
     aria-modal="true">
     <div
-      class="glass-panel w-full max-w-sm rounded-2xl border border-slate-800 shadow-2xl p-6 overflow-hidden animate-slide-down relative">
+      class="bg-slate-900/95 w-full max-w-md rounded-3xl border border-slate-800/80 shadow-2xl shadow-rose-950/20 p-6 md:p-7 overflow-hidden relative animate-slide-down">
+      
       <button id="btn-confirm-x" type="button"
-        class="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors"
+        class="absolute top-5 right-5 text-slate-400 hover:text-white p-2 hover:bg-slate-800/80 rounded-xl transition-all border border-transparent hover:border-slate-700/50"
         title="Fechar (X)">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <div class="flex items-center gap-3 text-rose-500 mb-3 pr-6">
-        <div class="p-2 bg-rose-500/10 rounded-xl">
+
+      <div class="flex items-center gap-3.5 mb-4 pr-8">
+        <div class="p-3 bg-gradient-to-tr from-rose-500/20 to-rose-600/10 border border-rose-500/30 rounded-2xl text-rose-400 shadow-inner shadow-rose-500/10 shrink-0">
           <i data-lucide="alert-triangle" class="w-6 h-6"></i>
         </div>
-        <h4 class="text-base font-bold text-slate-100">Confirmar Exclusão</h4>
+        <div>
+          <h4 class="text-lg font-bold text-slate-100 tracking-tight">Confirmar Exclusão</h4>
+          <p class="text-[11px] text-rose-400/90 font-medium">Esta ação é permanente</p>
+        </div>
       </div>
-      <p id="confirm-msg" class="text-sm text-slate-350 leading-relaxed">
-        Você tem certeza que deseja excluir esta entrada? Esta ação não poderá ser desfeita.
-      </p>
-      <div class="flex items-center gap-3 mt-6">
-        <button id="btn-confirm-cancel"
-          class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors">
+
+      <div class="bg-slate-950/90 border border-slate-800/70 rounded-2xl p-4 my-4 shadow-inner">
+        <p id="confirm-msg" class="text-sm text-slate-300 leading-relaxed font-normal">
+          Você tem certeza que deseja excluir esta entrada? Esta ação não poderá ser desfeita.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button id="btn-confirm-cancel" type="button"
+          class="flex-1 bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 px-4 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95">
           Cancelar
         </button>
-        <button id="btn-confirm-ok"
-          class="flex-1 bg-rose-600 hover:bg-rose-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-rose-600/20 transition-colors">
-          Excluir
+        <button id="btn-confirm-ok" type="button"
+          class="flex-1 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg shadow-rose-600/25 border border-rose-400/20 transition-all active:scale-95 flex items-center justify-center gap-2">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>Excluir</span>
         </button>
       </div>
     </div>
