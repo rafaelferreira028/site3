@@ -62,7 +62,7 @@ function saveLocalFallback() {
   } catch (e) {}
 }
 
-// Load data directly from Supabase DB table app_state
+// Load data directly from Supabase DB table app_state (Row id = "1")
 async function loadData() {
   showSyncIndicator('loading', 'Conectando Supabase...');
 
@@ -76,7 +76,8 @@ async function loadData() {
   try {
     const { data, error } = await supabaseClient
       .from('app_state')
-      .select('*');
+      .select('*')
+      .eq('id', '1');
 
     if (error) {
       console.error('Erro ao ler tabela app_state no Supabase:', error);
@@ -86,45 +87,32 @@ async function loadData() {
     }
 
     if (data && data.length > 0) {
-      const row = data.find(r => r.id === 1 || r.id === '1' || r.id === 'main' || r.id === 'global') || data[0];
+      const row = data[0];
 
       // Parse tracker_data
-      let parsedTracker = null;
       if (row.tracker_data) {
-        parsedTracker = typeof row.tracker_data === 'string' ? JSON.parse(row.tracker_data) : row.tracker_data;
-      } else if (row.payload && row.payload.trackerData) {
-        parsedTracker = row.payload.trackerData;
-      } else if (row.data && row.data.trackerData) {
-        parsedTracker = row.data.trackerData;
-      }
-
-      if (parsedTracker) {
-        trackerData = parsedTracker;
-        if (!trackerData.days) trackerData.days = [];
-        if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+        trackerData = typeof row.tracker_data === 'string' ? JSON.parse(row.tracker_data) : row.tracker_data;
       } else {
         trackerData = { days: [], dailyNotes: [] };
       }
+      if (!trackerData.days) trackerData.days = [];
+      if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
 
       // Parse global_balance
       if (row.global_balance !== undefined && row.global_balance !== null) {
         globalBalance = parseFloat(row.global_balance) || 0;
-      } else if (row.payload && row.payload.globalBalance !== undefined) {
-        globalBalance = parseFloat(row.payload.globalBalance) || 0;
       }
 
       // Parse balance_history
       if (row.balance_history) {
         balanceHistory = typeof row.balance_history === 'string' ? JSON.parse(row.balance_history) : row.balance_history;
-      } else if (row.payload && row.payload.balanceHistory) {
-        balanceHistory = row.payload.balanceHistory;
       }
       if (!Array.isArray(balanceHistory)) balanceHistory = [];
 
       saveLocalFallback();
       showSyncIndicator('synced', 'Supabase Conectado');
     } else {
-      console.log('Tabela app_state vazia. Gravando primeiro registro no Supabase...');
+      console.log('Tabela app_state vazia para id=1. Gravando dados no Supabase...');
       loadLocalFallback();
       await saveDataImmediate();
     }
@@ -144,36 +132,22 @@ async function saveDataImmediate() {
   showSyncIndicator('saving', 'Salvando...');
 
   try {
-    const payload = {
-      id: 1,
+    const record = {
+      id: "1",
       tracker_data: trackerData,
       global_balance: globalBalance,
       balance_history: balanceHistory,
-      payload: { trackerData, globalBalance, balanceHistory },
       updated_at: new Date().toISOString()
     };
 
-    let { error } = await supabaseClient
+    const { error } = await supabaseClient
       .from('app_state')
-      .upsert(payload, { onConflict: 'id' });
+      .upsert(record, { onConflict: 'id' });
 
     if (error) {
-      console.warn('Upsert id=1 falhou, tentando inserção alternativa no Supabase:', error);
-      const { error: insertError } = await supabaseClient
-        .from('app_state')
-        .insert([{
-          tracker_data: trackerData,
-          global_balance: globalBalance,
-          balance_history: balanceHistory,
-          payload: { trackerData, globalBalance, balanceHistory },
-          updated_at: new Date().toISOString()
-        }]);
-
-      if (insertError) {
-        console.error('Erro ao salvar no Supabase:', insertError);
-        showSyncIndicator('error', 'Erro ao salvar na nuvem');
-        return;
-      }
+      console.error('Erro ao salvar no Supabase:', error);
+      showSyncIndicator('error', 'Erro ao salvar na nuvem');
+      return;
     }
 
     showSyncIndicator('synced', 'Salvo no Supabase');
@@ -224,13 +198,14 @@ function handleRealtimeUpdate(payload) {
   const newRow = payload.new;
   if (!newRow) return;
 
+  // Only update if it pertains to row id "1"
+  if (newRow.id && String(newRow.id) !== "1") return;
+
   let updated = false;
 
   let remoteTracker = null;
   if (newRow.tracker_data) {
     remoteTracker = typeof newRow.tracker_data === 'string' ? JSON.parse(newRow.tracker_data) : newRow.tracker_data;
-  } else if (newRow.payload && newRow.payload.trackerData) {
-    remoteTracker = newRow.payload.trackerData;
   }
 
   if (remoteTracker && JSON.stringify(remoteTracker) !== JSON.stringify(trackerData)) {
@@ -243,8 +218,6 @@ function handleRealtimeUpdate(payload) {
   let remoteBalance = null;
   if (newRow.global_balance !== undefined && newRow.global_balance !== null) {
     remoteBalance = parseFloat(newRow.global_balance) || 0;
-  } else if (newRow.payload && newRow.payload.globalBalance !== undefined) {
-    remoteBalance = parseFloat(newRow.payload.globalBalance) || 0;
   }
 
   if (remoteBalance !== null && remoteBalance !== globalBalance) {
@@ -255,8 +228,6 @@ function handleRealtimeUpdate(payload) {
   let remoteHistory = null;
   if (newRow.balance_history) {
     remoteHistory = typeof newRow.balance_history === 'string' ? JSON.parse(newRow.balance_history) : newRow.balance_history;
-  } else if (newRow.payload && newRow.payload.balanceHistory) {
-    remoteHistory = newRow.payload.balanceHistory;
   }
 
   if (remoteHistory && JSON.stringify(remoteHistory) !== JSON.stringify(balanceHistory)) {
