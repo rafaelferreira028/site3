@@ -1187,14 +1187,14 @@ function renderAllDays(filterQuery = '') {
     const headerEl = dateCard.querySelector('.date-group-header');
     const contentEl = dateCard.querySelector('.date-group-content');
     const chevronIcon = dateCard.querySelector('.date-chevron-icon');
-    const btnDelDateGroup = dateCard.querySelector('.btn-delete-date-group');
-
-    if (btnDelDateGroup) {
-      btnDelDateGroup.addEventListener('click', (e) => {
+    const delDateGroupBtns = dateCard.querySelectorAll('.btn-delete-date-group');
+    delDateGroupBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         showConfirmDeleteDateGroup(dateKey);
       });
-    }
+    });
 
     if (headerEl && contentEl && chevronIcon) {
       headerEl.addEventListener('click', (e) => {
