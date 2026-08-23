@@ -1,0 +1,13 @@
+{
+  "name": "planilha-gulosa",
+  "version": "1.0.0",
+  "description": "Planilha Gulosa - Gestão & Rastreamento de Apostas Esportivas",
+  "main": "index.html",
+  "scripts": {
+    "dev": "http-server -p 3000 -c-1"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
