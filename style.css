@@ -92,13 +92,32 @@ body {
   animation: pulse-soft 2s infinite ease-in-out;
 }
 
-/* Custom inputs styling */
-input, select {
+/* Custom inputs styling - Force dark theme fields */
+input, select, textarea {
+  background-color: #030712 !important;
+  color: #f1f5f9 !important;
+  border-color: #1e293b;
   transition: all 0.2s ease-in-out;
 }
 
-input:focus, select:focus {
+select option {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* Chrome, Edge, Safari autofill override to preserve dark background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #030712 inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+input:focus, select:focus, textarea:focus {
   outline: none;
+  background-color: #0f172a !important;
   border-color: rgba(99, 102, 241, 0.6) !important;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
 }

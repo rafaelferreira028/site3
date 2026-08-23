@@ -607,7 +607,7 @@ function createDayElement(day) {
       </div>
 
       <!-- Centro: Apostado, Retorno Total e Resultado -->
-      <div class="grid grid-cols-3 md:flex items-center justify-between md:justify-center gap-2 md:gap-3 text-[11px] md:text-xs md:w-[480px] md:min-w-[480px] shrink-0 py-2 md:py-0 px-2 md:px-4 bg-slate-955/40 md:bg-transparent rounded-xl md:rounded-none border md:border-y-0 md:border-x border-slate-800/60 text-center md:text-left whitespace-nowrap">
+      <div class="grid grid-cols-3 md:flex items-center justify-between md:justify-center gap-2 md:gap-3 text-[11px] md:text-xs md:w-[480px] md:min-w-[480px] shrink-0 py-2 md:py-0 px-2 md:px-4 bg-slate-950/60 md:bg-transparent rounded-xl md:rounded-none border md:border-y-0 md:border-x border-slate-800/60 text-center md:text-left whitespace-nowrap">
         <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
           <span class="text-slate-500 md:text-slate-450 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Apostado</span>
           <strong class="text-slate-200 day-total-wagered text-xs md:text-xs">R$ 0,00</strong>
@@ -680,7 +680,7 @@ function createBetRowElement(dayId, bet) {
     <!-- Casa de Aposta -->
     <div class="col-span-2 md:col-span-2 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Casa de Aposta</label>
-      <input type="text" data-field="bookmaker" value="${bet.bookmaker || ''}" placeholder="Ex: Betfair / Bet365" class="w-full bg-slate-955/80 border border-slate-850/80 rounded-xl px-3 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-955 shadow-inner">
+      <input type="text" data-field="bookmaker" value="${bet.bookmaker || ''}" placeholder="Ex: Betfair / Bet365" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner">
     </div>
 
     <!-- Tipo (Exchange Back / Lay) -->
@@ -706,7 +706,7 @@ function createBetRowElement(dayId, bet) {
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Stake (R$)</label>
       <div class="relative">
         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">R$</span>
-        <input type="number" data-field="stake" value="${bet.stake || ''}" placeholder="0,00" step="0.01" min="0" class="w-full bg-slate-955/80 border border-slate-850/80 rounded-xl pl-7 pr-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-955 shadow-inner font-medium">
+        <input type="number" data-field="stake" value="${bet.stake || ''}" placeholder="0,00" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner font-medium">
       </div>
       <span class="liability-badge text-[10px] text-pink-400 font-semibold mt-1 hidden truncate"></span>
     </div>
@@ -714,19 +714,19 @@ function createBetRowElement(dayId, bet) {
     <!-- Odd -->
     <div class="col-span-1 md:col-span-1 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Odd</label>
-      <input type="number" data-field="odd" value="${bet.odd || ''}" placeholder="1.85" step="0.01" min="1" class="w-full bg-slate-955/80 border border-slate-850/80 rounded-xl px-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-955 shadow-inner font-medium">
+      <input type="number" data-field="odd" value="${bet.odd || ''}" placeholder="1.85" step="0.01" min="1" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner font-medium">
     </div>
     
     <!-- % Aumentada -->
     <div class="col-span-2 md:col-span-2 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">% Aumentada</label>
       <div class="flex items-center gap-1.5">
-        <button type="button" data-field="boostActive" data-active="${bet.boostActive ? 'true' : 'false'}" class="btn-boost flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl border text-xs font-bold transition-all ${bet.boostActive ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10' : 'bg-slate-955/80 border-slate-850/80 text-slate-400 hover:text-amber-400'}" title="Ativar % Aumentada">
+        <button type="button" data-field="boostActive" data-active="${bet.boostActive ? 'true' : 'false'}" class="btn-boost flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl border text-xs font-bold transition-all ${bet.boostActive ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-amber-400'}" title="Ativar % Aumentada">
           <i data-lucide="percent" class="w-3.5 h-3.5"></i>
           <span class="inline text-xs">%</span>
         </button>
         <div class="relative flex-1">
-          <input type="number" data-field="boostPercent" value="${bet.boostPercent || ''}" placeholder="0%" min="0" step="1" ${bet.boostActive ? '' : 'disabled'} class="w-full bg-slate-955/80 border border-slate-850/80 rounded-xl pl-2.5 pr-6 py-1.5 text-xs md:text-sm text-slate-200 focus:border-amber-500 focus:bg-slate-955 shadow-inner disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+          <input type="number" data-field="boostPercent" value="${bet.boostPercent || ''}" placeholder="0%" min="0" step="1" ${bet.boostActive ? '' : 'disabled'} class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-2.5 pr-6 py-1.5 text-xs md:text-sm text-slate-200 focus:border-amber-500 focus:bg-slate-950 shadow-inner disabled:opacity-40 disabled:cursor-not-allowed transition-all">
           <span class="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold ${bet.boostActive ? 'text-amber-400' : 'text-slate-600'} pointer-events-none">%</span>
         </div>
       </div>
@@ -735,7 +735,7 @@ function createBetRowElement(dayId, bet) {
     <!-- Status -->
     <div class="col-span-1 md:col-span-1 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Status</label>
-      <select data-field="status" class="w-full bg-slate-955/80 border border-slate-850/80 rounded-xl px-1.5 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:bg-slate-955 cursor-pointer shadow-inner">
+      <select data-field="status" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-1.5 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:bg-slate-950 cursor-pointer shadow-inner">
         <option value="pending" ${bet.status === 'pending' ? 'selected' : ''}>🟡 Pendente</option>
         <option value="green" ${bet.status === 'green' ? 'selected' : ''}>🟢 Green</option>
         <option value="red" ${bet.status === 'red' ? 'selected' : ''}>🔴 Red</option>
@@ -899,31 +899,49 @@ function renderAllDays(filterQuery = '') {
     const isExpanded = query.length > 0;
 
     dateCard.innerHTML = `
-      <div class="date-group-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-slate-900/50 hover:bg-slate-900/80 transition-colors cursor-pointer select-none">
+      <div class="date-group-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:p-4 bg-slate-900/50 hover:bg-slate-900/80 transition-colors cursor-pointer select-none">
         
-        <div class="flex items-center gap-3 min-w-0 flex-1">
-          <button type="button" class="btn-toggle-date-group p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
-            <i data-lucide="chevron-right" class="date-chevron-icon w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"></i>
+        <div class="flex items-center justify-between md:justify-start gap-2.5 min-w-0 flex-1">
+          <div class="flex items-center gap-2 min-w-0">
+            <button type="button" class="btn-toggle-date-group p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
+              <i data-lucide="chevron-right" class="date-chevron-icon w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"></i>
+            </button>
+
+            <span class="text-sm md:text-base font-bold text-slate-100 flex items-center gap-1.5 shrink-0">
+              <i data-lucide="calendar" class="w-4 h-4 md:w-4.5 md:h-4.5 text-indigo-400"></i>
+              ${formattedDate}
+            </span>
+
+            <span class="text-[10px] md:text-xs px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full font-semibold shrink-0">
+              ${sessions.length} ${sessions.length === 1 ? 'aposta' : 'apostas'}
+            </span>
+          </div>
+
+          <button type="button" class="btn-delete-date-group md:hidden p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
-
-          <span class="text-base font-bold text-slate-100 flex items-center gap-2 shrink-0">
-            <i data-lucide="calendar" class="w-4.5 h-4.5 text-indigo-400"></i>
-            ${formattedDate}
-          </span>
-
-          <span class="text-xs px-2.5 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full font-semibold shrink-0">
-            ${sessions.length} ${sessions.length === 1 ? 'aposta' : 'apostas'}
-          </span>
         </div>
 
-        <div class="flex items-center gap-3 text-xs md:w-[520px] md:min-w-[520px] shrink-0 py-1 md:py-0 border-t md:border-t-0 md:border-l border-slate-800/60 md:pl-4 whitespace-nowrap justify-between md:justify-end">
-          <span class="text-slate-400">Apostado: <strong class="text-slate-200 font-semibold date-total-wagered">${formatCurrency(dateWagered)}</strong></span>
-          <span class="text-slate-700 font-light">|</span>
-          <span class="text-slate-400">Retorno: <strong class="${returnColor} font-semibold date-total-return">${formatCurrency(dateReturn)}</strong></span>
-          <span class="text-slate-700 font-light">|</span>
-          <span class="text-slate-400">Resultado: <strong class="date-net-profit ${profitColor} font-bold">${profitSign}${formatCurrency(dateNetProfit)}</strong></span>
+        <div class="flex items-center gap-3 text-xs md:w-[520px] md:min-w-[520px] shrink-0 pt-2 md:pt-0 border-t md:border-t-0 md:border-l border-slate-800/60 md:pl-4 justify-between md:justify-end">
           
-          <button type="button" class="btn-delete-date-group ml-1.5 p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
+          <div class="grid grid-cols-3 md:flex items-center gap-1.5 md:gap-3 text-[11px] md:text-xs text-center md:text-left flex-1 md:flex-initial bg-slate-950/60 md:bg-transparent p-2 md:p-0 rounded-xl md:rounded-none border md:border-0 border-slate-800/60">
+            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
+              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Apostado</span>
+              <strong class="text-slate-200 font-semibold date-total-wagered text-xs">${formatCurrency(dateWagered)}</strong>
+            </div>
+
+            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1 border-x md:border-x-0 border-slate-800/60 px-1 md:px-0">
+              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Retorno</span>
+              <strong class="${returnColor} font-semibold date-total-return text-xs">${formatCurrency(dateReturn)}</strong>
+            </div>
+
+            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
+              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Resultado</span>
+              <strong class="date-net-profit ${profitColor} font-bold text-xs">${profitSign}${formatCurrency(dateNetProfit)}</strong>
+            </div>
+          </div>
+          
+          <button type="button" class="btn-delete-date-group hidden md:block ml-1.5 p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         </div>
@@ -3383,21 +3401,12 @@ window.addEventListener('DOMContentLoaded', () => {
   updateGlobalCapital();
   setDefaultNoteDate();
 
-  // Menu Mobile Listeners
+  // Menu Mobile Listener
   const btnMobileMenuToggle = document.getElementById('btn-mobile-menu-toggle');
-  const btnCloseMobileMenu = document.getElementById('btn-close-mobile-menu');
-
   if (btnMobileMenuToggle) {
     btnMobileMenuToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleMobileMenu();
-    });
-  }
-
-  if (btnCloseMobileMenu) {
-    btnCloseMobileMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeMobileMenu();
     });
   }
 });
