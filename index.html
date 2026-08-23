@@ -68,14 +68,17 @@
 
         <!-- Botão Menu Mobile (Visível apenas em telas pequenas < md) -->
         <div class="flex items-center gap-2 md:hidden">
-          <button id="btn-mobile-menu-toggle" class="p-2 text-slate-300 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition-colors" title="Menu de Ações">
+          <button id="btn-mobile-menu-toggle"
+            class="p-2 text-slate-300 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition-colors"
+            title="Menu de Ações">
             <i data-lucide="menu" class="w-5 h-5"></i>
           </button>
         </div>
       </div>
 
       <!-- Container de Ações (Retrátil no mobile, horizontal no Desktop) -->
-      <div id="header-actions" class="hidden md:flex flex-wrap items-center gap-2.5 md:gap-4 self-stretch md:self-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-900/80">
+      <div id="header-actions"
+        class="hidden md:flex flex-wrap items-center gap-2.5 md:gap-4 self-stretch md:self-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-900/80">
         <!-- Botão Adicionar Saldo -->
         <button id="btn-add-balance-modal"
           class="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 flex-1 md:flex-none">
@@ -120,7 +123,8 @@
   <main class="flex-grow max-w-[1750px] w-full mx-auto px-3 sm:px-4 md:px-6 py-5 md:py-8 space-y-6 md:space-y-8">
 
     <!-- Navegação por Abas -->
-    <div class="flex items-center gap-2 border-b border-slate-900 pb-px overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap md:flex-wrap">
+    <div
+      class="flex items-center gap-2 border-b border-slate-900 pb-px overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap md:flex-wrap">
       <button id="tab-dashboard"
         class="px-4 md:px-5 py-3 text-xs md:text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2 shrink-0">
         <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
@@ -205,8 +209,7 @@
           </div>
 
           <!-- Card 4: Saldo Ativo -->
-          <div
-            id="card-active-balance"
+          <div id="card-active-balance"
             class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
             <div class="flex items-center justify-between text-slate-400">
               <span class="text-xs font-semibold tracking-wider uppercase">Saldo Ativo</span>
@@ -218,7 +221,8 @@
               <span id="stat-active-balance" class="text-2xl font-bold tracking-tight text-emerald-400">R$ 0,00</span>
               <div id="stat-active-balance-subtext" class="text-xs text-slate-400 mt-1">
                 <span class="flex items-center gap-1.5 text-emerald-400/90 font-medium">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Saldo ativo no momento
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Saldo ativo no
+                  momento
                 </span>
               </div>
             </div>
@@ -330,12 +334,13 @@
 
     <!-- Conteúdo: Resumo de Apostas por Dia -->
     <div id="content-bets-summary" class="hidden space-y-6">
-      
+
       <!-- Cards de Resumo Acumulado Geral -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        
+
         <!-- Card 1: Total Apostado Geral -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Total Apostado Geral</span>
             <div class="p-2 bg-slate-900/60 rounded-lg">
@@ -349,7 +354,8 @@
         </div>
 
         <!-- Card 2: Retorno Total Geral -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Retorno Total Geral</span>
             <div class="p-2 bg-emerald-500/10 rounded-lg">
@@ -363,7 +369,8 @@
         </div>
 
         <!-- Card 3: Lucro Líquido Geral -->
-        <div id="summary-card-net-profit" class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-neutral">
+        <div id="summary-card-net-profit"
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-neutral">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Lucro Líquido Geral</span>
             <div class="p-2 bg-slate-900/60 rounded-lg" id="summary-icon-container-net-profit">
@@ -372,7 +379,8 @@
           </div>
           <div class="mt-4">
             <span id="summary-stat-net-profit" class="text-2xl font-bold tracking-tight text-slate-100">R$ 0,00</span>
-            <p class="text-xs text-slate-400 mt-1" id="summary-stat-net-profit-subtext">Lucro ou prejuízo líquido consolidado</p>
+            <p class="text-xs text-slate-400 mt-1" id="summary-stat-net-profit-subtext">Lucro ou prejuízo líquido
+              consolidado</p>
           </div>
         </div>
 
@@ -380,16 +388,19 @@
 
       <!-- Tabela Principal de Somatório por Dia -->
       <div class="glass-card rounded-2xl border border-slate-800 p-5 md:p-6 shadow-lg">
-        <div class="pb-4 border-b border-slate-900 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div
+          class="pb-4 border-b border-slate-900 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
               <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i>
               Resumo Consolidado por Dia
             </h3>
-            <p class="text-xs text-slate-450 mt-1">Visão simplificada com Total Apostado, Retorno Total e Lucro Líquido de cada dia.</p>
+            <p class="text-xs text-slate-450 mt-1">Visão simplificada com Total Apostado, Retorno Total e Lucro Líquido
+              de cada dia.</p>
           </div>
           <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
-            <span id="summary-days-count" class="text-xs px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 font-medium">
+            <span id="summary-days-count"
+              class="text-xs px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 font-medium">
               0 dias
             </span>
             <button id="btn-export-summary-csv"
@@ -438,10 +449,11 @@
 
     <!-- Conteúdo: Saldo & Anotações por Dia -->
     <div id="content-notes" class="hidden space-y-6">
-      
+
       <!-- Cards Informativos das Anotações -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Total de Anotações</span>
             <div class="p-2 bg-slate-900/60 rounded-lg">
@@ -454,7 +466,8 @@
           </div>
         </div>
 
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Dias com Anotação</span>
             <div class="p-2 bg-slate-900/60 rounded-lg">
@@ -467,7 +480,8 @@
           </div>
         </div>
 
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Último Registro</span>
             <div class="p-2 bg-slate-900/60 rounded-lg">
@@ -489,9 +503,11 @@
               <i data-lucide="pen-tool" class="w-5 h-5 text-indigo-400"></i>
               Nova Anotação Diária
             </h3>
-            <p class="text-xs text-slate-450 mt-1">Escreva observações, estratégias ou anotações livres sobre seu saldo e apostas para um dia específico.</p>
+            <p class="text-xs text-slate-450 mt-1">Escreva observações, estratégias ou anotações livres sobre seu saldo
+              e apostas para um dia específico.</p>
           </div>
-          <button id="btn-cancel-note-edit" type="button" class="hidden text-xs bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+          <button id="btn-cancel-note-edit" type="button"
+            class="hidden text-xs bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
             Cancelar Edição
           </button>
@@ -538,13 +554,15 @@
 
       <!-- Anotações Registradas por Dia -->
       <div class="glass-card rounded-2xl border border-slate-800 p-5 md:p-6 shadow-lg">
-        <div class="pb-4 border-b border-slate-900 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div
+          class="pb-4 border-b border-slate-900 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
               <i data-lucide="list-checks" class="w-5 h-5 text-indigo-400"></i>
               Minhas Anotações por Dia
             </h3>
-            <p class="text-xs text-slate-450 mt-1">Histórico completo de anotações organizadas por ordem cronológica.</p>
+            <p class="text-xs text-slate-450 mt-1">Histórico completo de anotações organizadas por ordem cronológica.
+            </p>
           </div>
 
           <!-- Filtro por Busca -->
@@ -575,7 +593,8 @@
       <!-- Section 1: Dashboard de Freebets -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Card 1: Total Valor Usado -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Total em Freebets</span>
             <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
@@ -583,13 +602,15 @@
             </div>
           </div>
           <div class="mt-4">
-            <span id="freebet-stat-total-amount" class="text-2xl font-bold tracking-tight text-indigo-400">R$ 0,00</span>
+            <span id="freebet-stat-total-amount" class="text-2xl font-bold tracking-tight text-indigo-400">R$
+              0,00</span>
             <p class="text-xs text-slate-400 mt-1">Valor acumulado utilizado</p>
           </div>
         </div>
 
         <!-- Card 2: Qtd. de Apostas Freebet -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Apostas Freebet</span>
             <div class="p-2 bg-slate-900/60 rounded-lg text-slate-400">
@@ -603,7 +624,8 @@
         </div>
 
         <!-- Card 3: % de Retorno em Freebets -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">% de Retorno</span>
             <div class="p-2 bg-slate-900/60 rounded-lg text-slate-400">
@@ -611,13 +633,15 @@
             </div>
           </div>
           <div class="mt-4">
-            <span id="freebet-stat-return-percent" class="text-2xl font-bold tracking-tight text-emerald-400">0,0%</span>
+            <span id="freebet-stat-return-percent"
+              class="text-2xl font-bold tracking-tight text-emerald-400">0,0%</span>
             <p class="text-xs text-slate-400 mt-1">Lucro extraído sobre o valor das freebets</p>
           </div>
         </div>
 
         <!-- Card 4: Lucro das Freebets -->
-        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+        <div
+          class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
             <span class="text-xs font-semibold tracking-wider uppercase">Lucro Extraído</span>
             <div class="p-2 bg-slate-900/60 rounded-lg text-slate-400">
@@ -639,7 +663,8 @@
               <i data-lucide="gift" class="w-5 h-5 text-indigo-400"></i>
               Dias que Utilizaram Freebet
             </h3>
-            <p class="text-xs text-slate-450 mt-1">Visualização detalhada de todas as sessões e apostas realizadas com saldo grátis.</p>
+            <p class="text-xs text-slate-450 mt-1">Visualização detalhada de todas as sessões e apostas realizadas com
+              saldo grátis.</p>
           </div>
 
           <!-- Filtro de busca de dias de freebet -->
@@ -663,7 +688,8 @@
             <i data-lucide="gift" class="w-10 h-10"></i>
           </div>
           <h4 class="text-base font-semibold text-slate-200">Nenhuma freebet encontrada</h4>
-          <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Para que um dia apareça nesta aba, marque a opção <strong class="text-indigo-400">Freebet</strong> em pelo menos uma das apostas cadastradas.</p>
+          <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Para que um dia apareça nesta aba, marque a opção
+            <strong class="text-indigo-400">Freebet</strong> em pelo menos uma das apostas cadastradas.</p>
         </div>
       </div>
     </div>
@@ -853,18 +879,23 @@
           <p class="text-xs text-slate-450 leading-relaxed">
             Importe um arquivo JSON de backup anteriormente baixado para recuperar seu histórico de dados.
           </p>
-          
+
           <!-- Drop Zone para Arrastar Arquivos -->
-          <div id="drop-zone" class="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-950/40 hover:bg-slate-900/10 group">
+          <div id="drop-zone"
+            class="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-950/40 hover:bg-slate-900/10 group">
             <input type="file" id="input-import-file" accept=".json" class="hidden">
-            <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-500 group-hover:text-indigo-400 mx-auto mb-2 transition-colors"></i>
-            <p class="text-xs font-semibold text-slate-300">Arraste seu arquivo backup (.json) ou clique para procurar</p>
+            <i data-lucide="upload-cloud"
+              class="w-8 h-8 text-slate-500 group-hover:text-indigo-400 mx-auto mb-2 transition-colors"></i>
+            <p class="text-xs font-semibold text-slate-300">Arraste seu arquivo backup (.json) ou clique para procurar
+            </p>
             <p class="text-[10px] text-slate-500 mt-1">Apenas arquivos no formato JSON gerados pelo sistema</p>
           </div>
-          
+
           <!-- Preview dos dados carregados do JSON (Escondido por padrão) -->
-          <div id="import-preview" class="hidden bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 space-y-2.5 animate-slide-down">
-            <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Conteúdo do Arquivo:</span>
+          <div id="import-preview"
+            class="hidden bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 space-y-2.5 animate-slide-down">
+            <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Conteúdo do
+              Arquivo:</span>
             <ul class="text-xs text-slate-300 space-y-1">
               <li id="preview-days">Dias de apostas: <strong class="text-white">-</strong></li>
               <li id="preview-bets">Total de apostas: <strong class="text-white">-</strong></li>
@@ -872,27 +903,32 @@
             </ul>
             <div class="bg-rose-500/10 border border-rose-500/25 rounded-lg p-2.5 flex gap-2 text-[11px] text-rose-400">
               <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500 flex-shrink-0"></i>
-              <span><strong>Atenção:</strong> A importação irá substituir permanentemente todos os dados atuais do seu navegador.</span>
+              <span><strong>Atenção:</strong> A importação irá substituir permanentemente todos os dados atuais do seu
+                navegador.</span>
             </div>
-            
+
             <div class="flex gap-2.5 pt-2">
-              <button type="button" id="btn-import-cancel" class="flex-1 bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-850 px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
+              <button type="button" id="btn-import-cancel"
+                class="flex-1 bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-850 px-3 py-2 rounded-lg text-xs font-semibold transition-colors">
                 Cancelar
               </button>
-              <button type="button" id="btn-import-confirm" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors">
+              <button type="button" id="btn-import-confirm"
+                class="flex-1 bg-rose-600 hover:bg-rose-500 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors">
                 Confirmar e Substituir
               </button>
             </div>
           </div>
 
           <!-- Alerta de Sucesso (Escondido por padrão) -->
-          <div id="import-success-alert" class="hidden bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3 text-xs text-emerald-400 flex items-center gap-2">
+          <div id="import-success-alert"
+            class="hidden bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3 text-xs text-emerald-400 flex items-center gap-2">
             <i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0 text-emerald-500"></i>
             <span>Dados restaurados com sucesso! A planilha foi atualizada.</span>
           </div>
-          
+
           <!-- Alerta de Erro (Escondido por padrão) -->
-          <div id="import-error-alert" class="hidden bg-rose-500/10 border border-rose-500/25 rounded-xl p-3 text-xs text-rose-455 flex items-center gap-2">
+          <div id="import-error-alert"
+            class="hidden bg-rose-500/10 border border-rose-500/25 rounded-xl p-3 text-xs text-rose-455 flex items-center gap-2">
             <i data-lucide="x-circle" class="w-4 h-4 flex-shrink-0 text-rose-500"></i>
             <span id="import-error-message">Erro ao processar o arquivo. Certifique-se de que é um backup válido.</span>
           </div>
@@ -932,13 +968,8 @@
 
   <!-- Footer -->
   <footer class="mt-auto py-6 border-t border-slate-900 bg-slate-950/80 text-center text-xs text-slate-450 glass-panel">
-    <div class="max-w-[1750px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+    <div class="max-w-[1750px] mx-auto px-4 flex items-center justify-center">
       <p>&copy; 2026 Planilha Gulosa. Todos os dados são armazenados localmente no seu dispositivo.</p>
-      <div class="flex gap-4">
-        <span class="hover:text-indigo-400 cursor-pointer">Privacidade</span>
-        <span>&bull;</span>
-        <span class="hover:text-indigo-400 cursor-pointer">Termos</span>
-      </div>
     </div>
   </footer>
 
