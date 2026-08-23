@@ -1169,6 +1169,8 @@ document.getElementById('btn-confirm-ok').addEventListener('click', () => {
 });
 
 document.getElementById('btn-confirm-cancel').addEventListener('click', hideConfirm);
+const btnConfirmX = document.getElementById('btn-confirm-x');
+if (btnConfirmX) btnConfirmX.addEventListener('click', hideConfirm);
 
 // Confirmation for deleting an entire day
 function showConfirmDeleteDay(dayId) {
@@ -1270,6 +1272,7 @@ const inputDate = document.getElementById('input-date');
 const inputNotes = document.getElementById('input-notes');
 
 function openNewDayModal() {
+  closeMobileMenu();
   // Set date to today's local date
   const tzoffset = (new Date()).getTimezoneOffset() * 60000; // offset in milliseconds
   const localISOTime = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 10);
@@ -1365,6 +1368,7 @@ const inputEditDate = document.getElementById('input-edit-date');
 const inputEditNotes = document.getElementById('input-edit-notes');
 
 function openEditDayModal(dayId) {
+  closeMobileMenu();
   const day = trackerData.days.find(d => d.id === dayId);
   if (!day) return;
 
@@ -1408,7 +1412,7 @@ if (formEditDay) {
 // WINDOW & DELEGATION EVENTS INITIALIZATION
 // ==========================================
 
-// Global click outside to dismiss modals
+// Global click outside to dismiss modals and mobile menu
 window.addEventListener('click', (e) => {
   if (e.target === modalNewDay) {
     closeNewDayModal();
@@ -1424,6 +1428,27 @@ window.addEventListener('click', (e) => {
   }
   if (e.target === document.getElementById('modal-confirm')) {
     hideConfirm();
+  }
+
+  // Dismiss mobile menu when clicking outside header-actions and mobile menu toggle
+  const headerActions = document.getElementById('header-actions');
+  const btnMobileMenuToggle = document.getElementById('btn-mobile-menu-toggle');
+  if (headerActions && !headerActions.classList.contains('hidden')) {
+    if (!headerActions.contains(e.target) && !btnMobileMenuToggle?.contains(e.target)) {
+      closeMobileMenu();
+    }
+  }
+});
+
+// ESC key listener to exit active modals or mobile menu
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeNewDayModal();
+    closeEditDayModal();
+    closeAddBalanceModal();
+    closeBackupRestoreModal();
+    hideConfirm();
+    closeMobileMenu();
   }
 });
 
@@ -1658,6 +1683,7 @@ const formAddBalance = document.getElementById('form-add-balance');
 const inputAddBalanceVal = document.getElementById('input-add-balance-val');
 
 function openAddBalanceModal() {
+  closeMobileMenu();
   if (!modalAddBalance) return;
   inputAddBalanceVal.value = ''; // Always open empty for a new entry
   modalAddBalance.classList.remove('hidden');
@@ -2427,6 +2453,7 @@ const contentFreebets = document.getElementById('content-freebets');
 const inputSearchFreebetDays = document.getElementById('input-search-freebet-days');
 
 function deactivateAllTabs() {
+  closeMobileMenu();
   if (tabDashboard) tabDashboard.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
   if (tabBetsSummary) tabBetsSummary.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
   if (tabHistory) tabHistory.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
@@ -2798,6 +2825,7 @@ const btnBackupRestoreModal = document.getElementById('btn-backup-restore-modal'
 const modalBackupClose = document.getElementById('modal-backup-close');
 
 function openBackupRestoreModal() {
+  closeMobileMenu();
   if (!modalBackupRestore) return;
   
   // Reset fields & alerts on open
@@ -3299,6 +3327,53 @@ if (inputSearchNotes) {
 }
 
 // ==========================================
+// MOBILE MENU NAVIGATION LOGIC
+// ==========================================
+
+function closeMobileMenu() {
+  const headerActions = document.getElementById('header-actions');
+  const mobileMenuIcon = document.getElementById('mobile-menu-icon');
+  const mobileMenuText = document.getElementById('mobile-menu-text');
+  if (headerActions && !headerActions.classList.contains('hidden')) {
+    headerActions.classList.add('hidden');
+  }
+  if (mobileMenuIcon) {
+    mobileMenuIcon.innerHTML = `<i data-lucide="menu" class="w-5 h-5"></i>`;
+    if (window.lucide) window.lucide.createIcons({ root: mobileMenuIcon });
+  }
+  if (mobileMenuText) {
+    mobileMenuText.textContent = 'Menu';
+  }
+}
+
+function openMobileMenu() {
+  const headerActions = document.getElementById('header-actions');
+  const mobileMenuIcon = document.getElementById('mobile-menu-icon');
+  const mobileMenuText = document.getElementById('mobile-menu-text');
+  if (headerActions) {
+    headerActions.classList.remove('hidden');
+  }
+  if (mobileMenuIcon) {
+    mobileMenuIcon.innerHTML = `<i data-lucide="x" class="w-5 h-5 text-rose-400"></i>`;
+    if (window.lucide) window.lucide.createIcons({ root: mobileMenuIcon });
+  }
+  if (mobileMenuText) {
+    mobileMenuText.textContent = 'Fechar';
+  }
+}
+
+function toggleMobileMenu() {
+  const headerActions = document.getElementById('header-actions');
+  if (headerActions) {
+    if (headerActions.classList.contains('hidden')) {
+      openMobileMenu();
+    } else {
+      closeMobileMenu();
+    }
+  }
+}
+
+// ==========================================
 // APP START
 // ==========================================
 
@@ -3308,13 +3383,21 @@ window.addEventListener('DOMContentLoaded', () => {
   updateGlobalCapital();
   setDefaultNoteDate();
 
-  // Menu Mobile Toggle
+  // Menu Mobile Listeners
   const btnMobileMenuToggle = document.getElementById('btn-mobile-menu-toggle');
-  const headerActions = document.getElementById('header-actions');
-  if (btnMobileMenuToggle && headerActions) {
+  const btnCloseMobileMenu = document.getElementById('btn-close-mobile-menu');
+
+  if (btnMobileMenuToggle) {
     btnMobileMenuToggle.addEventListener('click', (e) => {
       e.stopPropagation();
-      headerActions.classList.toggle('hidden');
+      toggleMobileMenu();
+    });
+  }
+
+  if (btnCloseMobileMenu) {
+    btnCloseMobileMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeMobileMenu();
     });
   }
 });

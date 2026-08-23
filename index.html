@@ -69,16 +69,31 @@
         <!-- Botão Menu Mobile (Visível apenas em telas pequenas < md) -->
         <div class="flex items-center gap-2 md:hidden">
           <button id="btn-mobile-menu-toggle"
-            class="p-2 text-slate-300 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition-colors"
+            class="px-3 py-2 text-slate-200 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-xs font-semibold"
             title="Menu de Ações">
-            <i data-lucide="menu" class="w-5 h-5"></i>
+            <span id="mobile-menu-icon" class="flex items-center"><i data-lucide="menu" class="w-5 h-5"></i></span>
+            <span id="mobile-menu-text">Menu</span>
           </button>
         </div>
       </div>
 
       <!-- Container de Ações (Retrátil no mobile, horizontal no Desktop) -->
       <div id="header-actions"
-        class="hidden md:flex flex-wrap items-center gap-2.5 md:gap-4 self-stretch md:self-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-900/80">
+        class="hidden md:flex flex-wrap items-center gap-2.5 md:gap-4 self-stretch md:self-auto pt-3 md:pt-0 border-t md:border-t-0 border-slate-900/80">
+        
+        <!-- Header do Menu Mobile com Botão Fechar (Visível apenas no mobile) -->
+        <div class="flex items-center justify-between w-full md:hidden pb-2.5 mb-1 border-b border-slate-800/80">
+          <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="sliders" class="w-4 h-4"></i> Opções do Menu
+          </span>
+          <button id="btn-close-mobile-menu" type="button"
+            class="px-2.5 py-1 text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 flex items-center gap-1 text-xs font-semibold transition-colors"
+            title="Fechar Menu (X)">
+            <span>Fechar</span>
+            <i data-lucide="x" class="w-4 h-4 text-slate-400"></i>
+          </button>
+        </div>
+
         <!-- Botão Adicionar Saldo -->
         <button id="btn-add-balance-modal"
           class="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 flex-1 md:flex-none">
@@ -943,8 +958,13 @@
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" role="dialog"
     aria-modal="true">
     <div
-      class="glass-panel w-full max-w-sm rounded-2xl border border-slate-800 shadow-2xl p-6 overflow-hidden animate-slide-down">
-      <div class="flex items-center gap-3 text-rose-500 mb-3">
+      class="glass-panel w-full max-w-sm rounded-2xl border border-slate-800 shadow-2xl p-6 overflow-hidden animate-slide-down relative">
+      <button id="btn-confirm-x" type="button"
+        class="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors"
+        title="Fechar (X)">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <div class="flex items-center gap-3 text-rose-500 mb-3 pr-6">
         <div class="p-2 bg-rose-500/10 rounded-xl">
           <i data-lucide="alert-triangle" class="w-6 h-6"></i>
         </div>
