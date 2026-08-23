@@ -58,10 +58,16 @@
             <i data-lucide="trending-up" class="w-5 h-5 md:w-6 md:h-6 text-white"></i>
           </div>
           <div>
-            <h1
-              class="text-lg md:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-indigo-300">
-              Planilha Gulosa
-            </h1>
+            <div class="flex items-center gap-2">
+              <h1
+                class="text-lg md:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-indigo-300">
+                Planilha Gulosa
+              </h1>
+              <div id="sync-status" class="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-slate-900/80 border border-slate-800 rounded-lg text-[10px] font-semibold text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="sync-status-text">Supabase Conectado</span>
+              </div>
+            </div>
             <p class="text-[10px] md:text-xs text-slate-400">Gestão & Rastreamento de Apostas Esportivas</p>
           </div>
         </div>
@@ -983,12 +989,14 @@
   <!-- Footer -->
   <footer class="mt-auto py-6 border-t border-slate-900 bg-slate-950/80 text-center text-xs text-slate-450 glass-panel">
     <div class="max-w-[1750px] mx-auto px-4 flex items-center justify-center">
-      <p>&copy; 2026 Planilha Gulosa. Todos os dados são armazenados localmente no seu dispositivo.</p>
+      <p>&copy; 2026 Planilha Gulosa. Dados sincronizados em tempo real na nuvem via Supabase.</p>
     </div>
   </footer>
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- App JS Logic -->
   <script src="app.js"></script>
 </body>

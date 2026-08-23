@@ -1,45 +1,282 @@
 // ==========================================
-// STATE MANAGEMENT & DATA PERSISTENCE
+// STATE MANAGEMENT & DATA PERSISTENCE (SUPABASE & REALTIME)
 // ==========================================
 
-let trackerData = { days: [], dailyNotes: [] };
+const SUPABASE_URL = 'https://lakilyuxnvxexkmophkl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
 
-// Load data from localStorage
-function loadData() {
-  const storedData = localStorage.getItem('sports_betting_tracker_data');
-  if (storedData) {
-    try {
-      trackerData = JSON.parse(storedData);
-      if (!trackerData.days) trackerData.days = [];
-      if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
-    } catch (e) {
-      console.error("Erro ao carregar dados do localStorage:", e);
-      trackerData = { days: [], dailyNotes: [] };
-    }
+let supabaseClient = null;
+if (window.supabase && typeof window.supabase.createClient === 'function') {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+let trackerData = { days: [], dailyNotes: [] };
+let globalBalance = 0;
+let balanceHistory = [];
+
+// Status indicator updater
+function showSyncIndicator(state, message) {
+  const statusContainer = document.getElementById('sync-status');
+  const statusText = document.getElementById('sync-status-text');
+  if (!statusContainer || !statusText) return;
+
+  statusContainer.classList.remove('hidden');
+
+  if (state === 'loading' || state === 'saving') {
+    statusContainer.className = 'hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-amber-950/40 border border-amber-500/30 rounded-lg text-[10px] font-semibold text-amber-400';
+    statusText.textContent = message || (state === 'loading' ? 'Carregando nuvem...' : 'Salvando...');
+  } else if (state === 'error') {
+    statusContainer.className = 'hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-rose-950/40 border border-rose-500/30 rounded-lg text-[10px] font-semibold text-rose-400';
+    statusText.textContent = message || 'Erro de sincronização';
   } else {
-    trackerData = { days: [], dailyNotes: [] };
+    statusContainer.className = 'hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-950/40 border border-emerald-500/30 rounded-lg text-[10px] font-semibold text-emerald-400';
+    statusText.textContent = message || 'Supabase Conectado';
   }
 }
 
-// Save data to localStorage immediately
-let saveTimeout;
+// Local cache helpers as secondary backup
+function loadLocalFallback() {
+  try {
+    const stored = localStorage.getItem('sports_betting_tracker_data');
+    if (stored) trackerData = JSON.parse(stored);
+    if (!trackerData.days) trackerData.days = [];
+    if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+
+    globalBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
+
+    const histStored = localStorage.getItem('planilhagulosa_balance_history');
+    if (histStored) balanceHistory = JSON.parse(histStored);
+    if (!Array.isArray(balanceHistory)) balanceHistory = [];
+  } catch (e) {
+    trackerData = { days: [], dailyNotes: [] };
+    globalBalance = 0;
+    balanceHistory = [];
+  }
+}
+
+function saveLocalFallback() {
+  try {
+    localStorage.setItem('sports_betting_tracker_data', JSON.stringify(trackerData));
+    localStorage.setItem('planilhagulosa_global_balance', globalBalance.toString());
+    localStorage.setItem('planilhagulosa_balance_history', JSON.stringify(balanceHistory));
+  } catch (e) {}
+}
+
+// Load data directly from Supabase DB table app_state
+async function loadData() {
+  showSyncIndicator('loading', 'Conectando Supabase...');
+
+  if (!supabaseClient) {
+    console.warn('SDK do Supabase não encontrado. Usando cache local.');
+    loadLocalFallback();
+    showSyncIndicator('error', 'Supabase indisponível');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('app_state')
+      .select('*');
+
+    if (error) {
+      console.error('Erro ao ler tabela app_state no Supabase:', error);
+      loadLocalFallback();
+      showSyncIndicator('error', 'Erro na leitura da nuvem');
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const row = data.find(r => r.id === 1 || r.id === '1' || r.id === 'main' || r.id === 'global') || data[0];
+
+      // Parse tracker_data
+      let parsedTracker = null;
+      if (row.tracker_data) {
+        parsedTracker = typeof row.tracker_data === 'string' ? JSON.parse(row.tracker_data) : row.tracker_data;
+      } else if (row.payload && row.payload.trackerData) {
+        parsedTracker = row.payload.trackerData;
+      } else if (row.data && row.data.trackerData) {
+        parsedTracker = row.data.trackerData;
+      }
+
+      if (parsedTracker) {
+        trackerData = parsedTracker;
+        if (!trackerData.days) trackerData.days = [];
+        if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+      } else {
+        trackerData = { days: [], dailyNotes: [] };
+      }
+
+      // Parse global_balance
+      if (row.global_balance !== undefined && row.global_balance !== null) {
+        globalBalance = parseFloat(row.global_balance) || 0;
+      } else if (row.payload && row.payload.globalBalance !== undefined) {
+        globalBalance = parseFloat(row.payload.globalBalance) || 0;
+      }
+
+      // Parse balance_history
+      if (row.balance_history) {
+        balanceHistory = typeof row.balance_history === 'string' ? JSON.parse(row.balance_history) : row.balance_history;
+      } else if (row.payload && row.payload.balanceHistory) {
+        balanceHistory = row.payload.balanceHistory;
+      }
+      if (!Array.isArray(balanceHistory)) balanceHistory = [];
+
+      saveLocalFallback();
+      showSyncIndicator('synced', 'Supabase Conectado');
+    } else {
+      console.log('Tabela app_state vazia. Gravando primeiro registro no Supabase...');
+      loadLocalFallback();
+      await saveDataImmediate();
+    }
+  } catch (err) {
+    console.error('Falha na comunicação com Supabase:', err);
+    loadLocalFallback();
+    showSyncIndicator('error', 'Modo Offline');
+  }
+}
+
+// Immediate save to Supabase
+async function saveDataImmediate() {
+  saveLocalFallback();
+
+  if (!supabaseClient) return;
+
+  showSyncIndicator('saving', 'Salvando...');
+
+  try {
+    const payload = {
+      id: 1,
+      tracker_data: trackerData,
+      global_balance: globalBalance,
+      balance_history: balanceHistory,
+      payload: { trackerData, globalBalance, balanceHistory },
+      updated_at: new Date().toISOString()
+    };
+
+    let { error } = await supabaseClient
+      .from('app_state')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Upsert id=1 falhou, tentando inserção alternativa no Supabase:', error);
+      const { error: insertError } = await supabaseClient
+        .from('app_state')
+        .insert([{
+          tracker_data: trackerData,
+          global_balance: globalBalance,
+          balance_history: balanceHistory,
+          payload: { trackerData, globalBalance, balanceHistory },
+          updated_at: new Date().toISOString()
+        }]);
+
+      if (insertError) {
+        console.error('Erro ao salvar no Supabase:', insertError);
+        showSyncIndicator('error', 'Erro ao salvar na nuvem');
+        return;
+      }
+    }
+
+    showSyncIndicator('synced', 'Salvo no Supabase');
+  } catch (err) {
+    console.error('Erro ao salvar no Supabase:', err);
+    showSyncIndicator('error', 'Erro na nuvem');
+  }
+}
+
+let saveTimeout = null;
 function saveData() {
   if (saveTimeout) clearTimeout(saveTimeout);
-  localStorage.setItem('sports_betting_tracker_data', JSON.stringify(trackerData));
-}
-
-// Debounced version of saveData for fast-typing input events
-function debouncedSaveData() {
-  if (saveTimeout) clearTimeout(saveTimeout);
+  showSyncIndicator('saving', 'Salvando...');
   saveTimeout = setTimeout(() => {
-    saveData();
-  }, 500);
+    saveDataImmediate();
+  }, 400);
 }
 
-// Ensure pending data is saved when the window is closed/reloaded
+function debouncedSaveData() {
+  saveData();
+}
+
+// Subscribe to Supabase Realtime changes for cross-device sync
+function initRealtimeSync() {
+  if (!supabaseClient) return;
+
+  try {
+    supabaseClient
+      .channel('app_state_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state' },
+        (payload) => {
+          handleRealtimeUpdate(payload);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Sincronização em tempo real ativada com sucesso!');
+        }
+      });
+  } catch (e) {
+    console.error('Erro ao inicializar Realtime:', e);
+  }
+}
+
+function handleRealtimeUpdate(payload) {
+  const newRow = payload.new;
+  if (!newRow) return;
+
+  let updated = false;
+
+  let remoteTracker = null;
+  if (newRow.tracker_data) {
+    remoteTracker = typeof newRow.tracker_data === 'string' ? JSON.parse(newRow.tracker_data) : newRow.tracker_data;
+  } else if (newRow.payload && newRow.payload.trackerData) {
+    remoteTracker = newRow.payload.trackerData;
+  }
+
+  if (remoteTracker && JSON.stringify(remoteTracker) !== JSON.stringify(trackerData)) {
+    trackerData = remoteTracker;
+    if (!trackerData.days) trackerData.days = [];
+    if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+    updated = true;
+  }
+
+  let remoteBalance = null;
+  if (newRow.global_balance !== undefined && newRow.global_balance !== null) {
+    remoteBalance = parseFloat(newRow.global_balance) || 0;
+  } else if (newRow.payload && newRow.payload.globalBalance !== undefined) {
+    remoteBalance = parseFloat(newRow.payload.globalBalance) || 0;
+  }
+
+  if (remoteBalance !== null && remoteBalance !== globalBalance) {
+    globalBalance = remoteBalance;
+    updated = true;
+  }
+
+  let remoteHistory = null;
+  if (newRow.balance_history) {
+    remoteHistory = typeof newRow.balance_history === 'string' ? JSON.parse(newRow.balance_history) : newRow.balance_history;
+  } else if (newRow.payload && newRow.payload.balanceHistory) {
+    remoteHistory = newRow.payload.balanceHistory;
+  }
+
+  if (remoteHistory && JSON.stringify(remoteHistory) !== JSON.stringify(balanceHistory)) {
+    balanceHistory = remoteHistory;
+    updated = true;
+  }
+
+  if (updated) {
+    saveLocalFallback();
+    renderAllDays(document.getElementById('input-search-days')?.value || '');
+    updateGlobalCapital();
+    renderHistory();
+    renderDailyNotes(document.getElementById('input-search-notes')?.value || '');
+    showSyncIndicator('synced', 'Atualizado em tempo real');
+  }
+}
+
 window.addEventListener('beforeunload', () => {
   if (saveTimeout) {
-    saveData();
+    saveDataImmediate();
   }
 });
 
@@ -1670,11 +1907,11 @@ function updateGlobalCapital() {
   const totalDisplay = document.getElementById('display-global-total');
   if (!totalDisplay) return;
 
-  const addedBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
+  const addedBalance = globalBalance;
   
   let netProfit = 0;
   trackerData.days.forEach(day => {
-    day.bets.forEach(bet => {
+    (day.bets || []).forEach(bet => {
       netProfit += bet.profit || 0;
     });
   });
@@ -1722,10 +1959,8 @@ if (formAddBalance) {
     const val = parseFloat(inputAddBalanceVal.value) || 0;
     
     if (val !== 0) {
-      // Accumulate onto the current global balance!
-      let savedBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
-      savedBalance += val;
-      localStorage.setItem('planilhagulosa_global_balance', savedBalance.toString());
+      // Accumulate onto the global balance!
+      globalBalance += val;
       
       // Save transaction to history list
       const history = getBalanceHistory();
@@ -1748,15 +1983,12 @@ if (formAddBalance) {
 // ==========================================
 
 function getBalanceHistory() {
-  try {
-    return JSON.parse(localStorage.getItem('planilhagulosa_balance_history')) || [];
-  } catch (e) {
-    return [];
-  }
+  return balanceHistory || [];
 }
 
 function saveBalanceHistory(history) {
-  localStorage.setItem('planilhagulosa_balance_history', JSON.stringify(history));
+  balanceHistory = history || [];
+  saveData();
 }
 
 function formatDateTime(isoString) {
@@ -2820,9 +3052,7 @@ if (historyTableBody) {
     
     if (tx) {
       showConfirm(`Deseja desfazer este lançamento de ${tx.amount >= 0 ? '+' : ''}R$ ${tx.amount.toFixed(2)}? O saldo da banca será atualizado removendo este valor.`, () => {
-        let savedBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
-        savedBalance -= tx.amount;
-        localStorage.setItem('planilhagulosa_global_balance', savedBalance.toString());
+        globalBalance -= tx.amount;
         
         const updatedHistory = history.filter(t => t.id !== txId);
         saveBalanceHistory(updatedHistory);
@@ -2878,7 +3108,7 @@ if (btnExportJson) {
         version: 1,
         timestamp: new Date().toISOString(),
         sports_betting_tracker_data: trackerData,
-        planilhagulosa_global_balance: localStorage.getItem('planilhagulosa_global_balance') || '0',
+        planilhagulosa_global_balance: globalBalance.toString(),
         planilhagulosa_balance_history: getBalanceHistory()
       };
       
@@ -3069,15 +3299,15 @@ if (btnImportCancel) {
 }
 
 if (btnImportConfirm) {
-  btnImportConfirm.addEventListener('click', () => {
+  btnImportConfirm.addEventListener('click', async () => {
     if (!pendingBackupData) return;
     
     try {
-      localStorage.setItem('sports_betting_tracker_data', JSON.stringify(pendingBackupData.sports_betting_tracker_data));
-      localStorage.setItem('planilhagulosa_global_balance', pendingBackupData.planilhagulosa_global_balance);
-      localStorage.setItem('planilhagulosa_balance_history', JSON.stringify(pendingBackupData.planilhagulosa_balance_history));
+      trackerData = pendingBackupData.sports_betting_tracker_data || { days: [], dailyNotes: [] };
+      globalBalance = parseFloat(pendingBackupData.planilhagulosa_global_balance) || 0;
+      balanceHistory = pendingBackupData.planilhagulosa_balance_history || [];
       
-      trackerData = pendingBackupData.sports_betting_tracker_data;
+      await saveDataImmediate();
       
       renderAllDays();
       updateGlobalCapital();
@@ -3395,8 +3625,9 @@ function toggleMobileMenu() {
 // APP START
 // ==========================================
 
-window.addEventListener('DOMContentLoaded', () => {
-  loadData();
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadData();
+  initRealtimeSync();
   renderAllDays();
   updateGlobalCapital();
   setDefaultNoteDate();
