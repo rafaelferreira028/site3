@@ -3271,10 +3271,10 @@ function openExportCalcModal() {
   // Preencher select de dias existentes
   if (dateSelect) {
     const existingDays = (trackerData.days || []).map(d => d.date);
-    let optionsHtml = `<option value="${todayStr}">Hoje (${formatDateDisplay(todayStr)})</option>`;
+    let optionsHtml = `<option value="${todayStr}">Hoje (${formatDate(todayStr)})</option>`;
     existingDays.forEach(d => {
       if (d !== todayStr) {
-        optionsHtml += `<option value="${d}">${formatDateDisplay(d)}</option>`;
+        optionsHtml += `<option value="${d}">${formatDate(d)}</option>`;
       }
     });
     dateSelect.innerHTML = optionsHtml;
