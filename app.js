@@ -2792,12 +2792,102 @@ if (inputSearchFreebetDays) {
 
 let calcState = {
   mode: 'surebet', // 'surebet' | 'freebet' | 'dutching' | 'riskfree'
-  numBets: 2,     // 2 | 3
-  stakeMode: 'fixed1', // 'fixed1' | 'total'
-  rounding: 'none' // 'none' | '1' | '5' | '10'
+  rounding: 'none', // 'none' | '1' | '5' | '10'
+  entries: [
+    { id: 1, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 },
+    { id: 2, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 }
+  ]
 };
 
+function renderCalcEntries() {
+  const container = document.getElementById('calc-entries-container');
+  if (!container) return;
+
+  const isRemoveable = calcState.entries.length > 2;
+
+  container.innerHTML = calcState.entries.map((entry, index) => {
+    const housePlaceholder = `Ex: Seleção / Casa ${index + 1}`;
+    const oddPlaceholder = `Ex: 2.10`;
+    const commPlaceholder = `0%`;
+
+    return `
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center relative transition-all">
+        <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção ${index + 1}</label>
+          <input type="text" data-entry-field="house" data-entry-index="${index}" value="${entry.house || ''}" placeholder="${housePlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Odd Aposta ${index + 1}</label>
+          <input type="number" step="0.01" min="1.01" data-entry-field="odd" data-entry-index="${index}" value="${entry.odd || ''}" placeholder="${oddPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-indigo-500 focus:outline-none">
+        </div>
+
+        <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Calculada (R$)</label>
+          <input type="text" id="calc-stake-display-${index}" readonly value="${entry.calculatedStake ? 'R$ ' + entry.calculatedStake.toFixed(2).replace('.', ',') : 'R$ 0,00'}" class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:outline-none cursor-not-allowed">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Saldo</label>
+          <select data-entry-field="type" data-entry-index="${index}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
+            <option value="real" ${entry.type === 'real' ? 'selected' : ''}>Saldo Real</option>
+            <option value="freebet_snr" ${entry.type === 'freebet_snr' ? 'selected' : ''}>Freebet SNR</option>
+            <option value="freebet_sr" ${entry.type === 'freebet_sr' ? 'selected' : ''}>Freebet SR</option>
+          </select>
+        </div>
+
+        <div class="${isRemoveable ? 'sm:col-span-1' : 'sm:col-span-2'}">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Comissão</label>
+          <input type="number" step="0.5" min="0" max="100" data-entry-field="comm" data-entry-index="${index}" value="${entry.comm || ''}" placeholder="${commPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-300 font-medium focus:border-indigo-500 focus:outline-none">
+        </div>
+
+        ${isRemoveable ? `
+          <div class="sm:col-span-1 flex items-center justify-center pt-2 sm:pt-4">
+            <button type="button" data-remove-entry-index="${index}" class="p-2 text-slate-400 hover:text-rose-400 bg-slate-950 border border-slate-800 rounded-lg hover:border-rose-500/40 transition-colors" title="Remover seleção">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Event Listeners dos Inputs Dinâmicos
+  const inputs = container.querySelectorAll('input, select');
+  inputs.forEach(input => {
+    const field = input.getAttribute('data-entry-field');
+    const idx = parseInt(input.getAttribute('data-entry-index'), 10);
+    if (field && !isNaN(idx) && calcState.entries[idx]) {
+      const handler = (e) => {
+        calcState.entries[idx][field] = e.target.value;
+        calculateBetTracker();
+      };
+      input.addEventListener('input', handler);
+      input.addEventListener('change', handler);
+    }
+  });
+
+  // Event Listeners dos Botões de Lixeira / Exclusão
+  const removeBtns = container.querySelectorAll('[data-remove-entry-index]');
+  removeBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const idx = parseInt(btn.getAttribute('data-remove-entry-index'), 10);
+      if (!isNaN(idx) && calcState.entries.length > 2) {
+        calcState.entries.splice(idx, 1);
+        renderCalcEntries();
+        calculateBetTracker();
+      }
+    });
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
 function initBetTrackerCalculator() {
+  // Renderizar entradas iniciais vazias
+  renderCalcEntries();
+
   // Selectores de Modo
   const btnModeSurebet = document.getElementById('calc-mode-surebet');
   const btnModeFreebet = document.getElementById('calc-mode-freebet');
@@ -2826,60 +2916,20 @@ function initBetTrackerCalculator() {
       const badge = document.getElementById('calc-current-mode-badge');
       if (badge) badge.textContent = item.name;
 
-      // Se mudar para freebet, predefinir aposta 1 como freebet SNR se estiver como real
-      if (item.mode === 'freebet') {
-        const type1 = document.getElementById('calc-type-1');
-        if (type1 && type1.value === 'real') type1.value = 'freebet_snr';
+      if (item.mode === 'freebet' && calcState.entries.length > 0) {
+        calcState.entries[0].type = 'freebet_snr';
+        renderCalcEntries();
       }
 
       calculateBetTracker();
     });
   });
 
-  // Alternador 2 vs 3 Apostas
-  const btnNum2 = document.getElementById('calc-num-bets-2');
-  const btnNum3 = document.getElementById('calc-num-bets-3');
-  const row3 = document.getElementById('calc-row-3');
-
-  if (btnNum2 && btnNum3) {
-    btnNum2.addEventListener('click', () => {
-      calcState.numBets = 2;
-      btnNum2.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
-      btnNum3.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
-      if (row3) row3.classList.add('hidden');
-      calculateBetTracker();
-    });
-
-    btnNum3.addEventListener('click', () => {
-      calcState.numBets = 3;
-      btnNum3.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
-      btnNum2.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
-      if (row3) row3.classList.remove('hidden');
-      calculateBetTracker();
-    });
-  }
-
-  // Alternador Stake Mode (Aposta 1 vs Total)
-  const btnStakeFixed1 = document.getElementById('calc-stake-mode-fixed1');
-  const btnStakeTotal = document.getElementById('calc-stake-mode-total');
-  const labelStake1 = document.getElementById('calc-label-stake-1');
-
-  if (btnStakeFixed1 && btnStakeTotal) {
-    btnStakeFixed1.addEventListener('click', () => {
-      calcState.stakeMode = 'fixed1';
-      btnStakeFixed1.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
-      btnStakeTotal.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
-      if (labelStake1) labelStake1.textContent = "Valor Stake (R$)";
-      calculateBetTracker();
-    });
-
-    btnStakeTotal.addEventListener('click', () => {
-      calcState.stakeMode = 'total';
-      btnStakeTotal.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
-      btnStakeFixed1.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
-      if (labelStake1) labelStake1.textContent = "Stake Total Evento (R$)";
-      calculateBetTracker();
-    });
+  // Input de Investimento Total
+  const inputTotalInv = document.getElementById('calc-total-investment');
+  if (inputTotalInv) {
+    inputTotalInv.addEventListener('input', calculateBetTracker);
+    inputTotalInv.addEventListener('change', calculateBetTracker);
   }
 
   // Arredondamento Select
@@ -2891,41 +2941,27 @@ function initBetTrackerCalculator() {
     });
   }
 
-  // Input Listeners para recalcular em tempo real
-  const inputsToListen = [
-    'calc-odd-1', 'calc-stake-1', 'calc-type-1', 'calc-comm-1', 'calc-house-1',
-    'calc-odd-2', 'calc-type-2', 'calc-comm-2', 'calc-house-2',
-    'calc-odd-3', 'calc-type-3', 'calc-comm-3', 'calc-house-3'
-  ];
-
-  inputsToListen.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', calculateBetTracker);
-      el.addEventListener('change', calculateBetTracker);
-    }
-  });
+  // Botão Adicionar Seleção (+)
+  const btnAddEntry = document.getElementById('calc-btn-add-entry');
+  if (btnAddEntry) {
+    btnAddEntry.addEventListener('click', () => {
+      const nextId = Date.now();
+      calcState.entries.push({ id: nextId, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 });
+      renderCalcEntries();
+      calculateBetTracker();
+    });
+  }
 
   // Botão Limpar / Reset
   const btnReset = document.getElementById('calc-btn-reset');
   if (btnReset) {
     btnReset.addEventListener('click', () => {
-      const odd1 = document.getElementById('calc-odd-1');
-      const stake1 = document.getElementById('calc-stake-1');
-      const odd2 = document.getElementById('calc-odd-2');
-      const odd3 = document.getElementById('calc-odd-3');
-      const house1 = document.getElementById('calc-house-1');
-      const house2 = document.getElementById('calc-house-2');
-      const house3 = document.getElementById('calc-house-3');
-
-      if (odd1) odd1.value = '2.10';
-      if (stake1) stake1.value = '100';
-      if (odd2) odd2.value = '2.10';
-      if (odd3) odd3.value = '3.50';
-      if (house1) house1.value = 'Bet365 (Casa 1)';
-      if (house2) house2.value = 'Betano (Casa 2)';
-      if (house3) house3.value = 'KTO (Casa 3)';
-
+      if (inputTotalInv) inputTotalInv.value = '';
+      calcState.entries = [
+        { id: 1, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 },
+        { id: 2, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 }
+      ];
+      renderCalcEntries();
       calculateBetTracker();
     });
   }
@@ -2954,23 +2990,65 @@ function applyStakeRounding(val, type) {
 }
 
 function calculateBetTracker() {
-  const o1 = parseFloat(document.getElementById('calc-odd-1')?.value) || 1.01;
-  const o2 = parseFloat(document.getElementById('calc-odd-2')?.value) || 1.01;
-  const o3 = parseFloat(document.getElementById('calc-odd-3')?.value) || 1.01;
+  const totalInv = parseFloat(document.getElementById('calc-total-investment')?.value) || 0;
 
-  let baseInputVal = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
+  // Extração das odds e dados das entradas
+  const parsedEntries = calcState.entries.map(e => ({
+    house: e.house || '',
+    odd: parseFloat(e.odd) || 0,
+    type: e.type || 'real',
+    comm: (parseFloat(e.comm) || 0) / 100
+  }));
 
-  const t1 = document.getElementById('calc-type-1')?.value || 'real';
-  const t2 = document.getElementById('calc-type-2')?.value || 'real';
-  const t3 = document.getElementById('calc-type-3')?.value || 'real';
+  const resProfit = document.getElementById('calc-res-profit');
+  const resRoi = document.getElementById('calc-res-roi');
+  const badgeSurebet = document.getElementById('calc-badge-surebet');
+  const resTotalInvested = document.getElementById('calc-res-total-invested');
+  const resAvgPayout = document.getElementById('calc-res-avg-payout');
+  const resModeLabel = document.getElementById('calc-res-mode-label');
+  const tbody = document.getElementById('calc-scenarios-tbody');
 
-  const c1 = (parseFloat(document.getElementById('calc-comm-1')?.value) || 0) / 100;
-  const c2 = (parseFloat(document.getElementById('calc-comm-2')?.value) || 0) / 100;
-  const c3 = (parseFloat(document.getElementById('calc-comm-3')?.value) || 0) / 100;
+  // Caso os dados estejam incompletos ou sem valor investido
+  const hasValidOdds = parsedEntries.every(e => e.odd > 1.0);
 
-  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
-  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
-  const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
+  if (totalInv <= 0 || !hasValidOdds) {
+    calcState.entries.forEach((e, idx) => {
+      e.calculatedStake = 0;
+      const el = document.getElementById(`calc-stake-display-${idx}`);
+      if (el) el.value = 'R$ 0,00';
+    });
+
+    if (resProfit) {
+      resProfit.textContent = 'R$ 0,00';
+      resProfit.className = "text-3xl font-black text-slate-400 tracking-tight mt-1";
+    }
+
+    if (resRoi) {
+      resRoi.innerHTML = `<i data-lucide="info" class="w-3.5 h-3.5"></i> Digite o valor total e as odds para calcular`;
+      resRoi.className = "text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1";
+    }
+
+    if (badgeSurebet) {
+      badgeSurebet.textContent = "Aguardando Dados";
+      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+    }
+
+    if (resTotalInvested) resTotalInvested.textContent = 'R$ 0,00';
+    if (resAvgPayout) resAvgPayout.textContent = 'R$ 0,00';
+
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="py-8 text-center text-slate-500 text-xs font-medium">
+            Preencha o <strong>Valor Total a Apostar</strong> e as <strong>Odds</strong> de todas as entradas acima para visualizar a análise dos cenários.
+          </td>
+        </tr>
+      `;
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
 
   // Fator multiplicador líquido por aposta
   const getMultiplier = (odd, type, comm) => {
@@ -2984,119 +3062,72 @@ function calculateBetTracker() {
     return 1 + (odd - 1) * (1 - comm);
   };
 
-  const e1 = getMultiplier(o1, t1, c1);
-  const e2 = getMultiplier(o2, t2, c2);
-  const e3 = getMultiplier(o3, t3, c3);
+  const multipliers = parsedEntries.map(e => getMultiplier(e.odd, e.type, e.comm));
 
-  let rawS1 = 0, rawS2 = 0, rawS3 = 0;
+  let rawStakes = [];
 
   if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
-    const P = (1 / e1) + (1 / e2) + (calcState.numBets === 3 ? (1 / e3) : 0);
-    if (calcState.stakeMode === 'fixed1') {
-      rawS1 = baseInputVal;
-      const targetPayout = rawS1 * e1;
-      rawS2 = targetPayout / e2;
-      rawS3 = calcState.numBets === 3 ? (targetPayout / e3) : 0;
-    } else {
-      // Stake Total
-      const totalS = baseInputVal;
-      rawS1 = totalS / (e1 * P);
-      rawS2 = totalS / (e2 * P);
-      rawS3 = calcState.numBets === 3 ? (totalS / (e3 * P)) : 0;
-    }
+    const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
+    rawStakes = multipliers.map(m => totalInv / (m * P));
   } else if (calcState.mode === 'freebet') {
-    // Aposta 1 é a Freebet
-    rawS1 = baseInputVal;
-    const targetNetWin1 = rawS1 * e1; // Lucro líquido se aposta 1 (Freebet) vencer
-    // Para Aposta 2 (Saldo Real) equalizar lucro:
-    // S2 * e2 - S2 = TargetNetWin1 => S2 * (e2 - 1) = TargetNetWin1
-    rawS2 = (e2 > 1) ? (targetNetWin1 / (e2 - 1)) : 0;
-    if (calcState.numBets === 3) {
-      rawS3 = (e3 > 1) ? (targetNetWin1 / (e3 - 1)) : 0;
-    } else {
-      rawS3 = 0;
+    // Aposta 1 é a Freebet (Valor = totalInv)
+    rawStakes[0] = totalInv;
+    const targetNetWin1 = rawStakes[0] * multipliers[0];
+    for (let i = 1; i < parsedEntries.length; i++) {
+      const m = multipliers[i];
+      rawStakes[i] = (m > 1) ? (targetNetWin1 / (m - 1)) : 0;
     }
   } else if (calcState.mode === 'riskfree') {
-    // Sem Risco na Aposta 1 (se Aposta 1 perder, Aposta 2 cobre a Stake 1)
-    rawS1 = baseInputVal;
-    rawS2 = (e2 > 1) ? (rawS1 / (e2 - 1)) : 0;
-    rawS3 = (calcState.numBets === 3 && e3 > 1) ? (rawS1 / (e3 - 1)) : 0;
+    // Sem Risco na Aposta 1 (se Aposta 1 perder, as outras cobrem a Stake 1)
+    rawStakes[0] = totalInv;
+    for (let i = 1; i < parsedEntries.length; i++) {
+      const m = multipliers[i];
+      rawStakes[i] = (m > 1) ? (rawStakes[0] / (m - 1)) : 0;
+    }
   }
 
   // Aplicar Arredondamento
-  let finalS1 = Math.max(0, rawS1);
-  let finalS2 = Math.max(0, applyStakeRounding(rawS2, calcState.rounding));
-  let finalS3 = calcState.numBets === 3 ? Math.max(0, applyStakeRounding(rawS3, calcState.rounding)) : 0;
+  const finalStakes = rawStakes.map(s => Math.max(0, applyStakeRounding(s, calcState.rounding)));
 
-  // Atualizar inputs read-only das stakes 2 e 3 na interface
-  const inputStake2 = document.getElementById('calc-stake-2');
-  const inputStake3 = document.getElementById('calc-stake-3');
-  if (inputStake2) inputStake2.value = finalS2.toFixed(2);
-  if (inputStake3) inputStake3.value = finalS3.toFixed(2);
+  // Atualizar calcState e displays de stake
+  finalStakes.forEach((stake, idx) => {
+    if (calcState.entries[idx]) calcState.entries[idx].calculatedStake = stake;
+    const el = document.getElementById(`calc-stake-display-${idx}`);
+    if (el) el.value = 'R$ ' + stake.toFixed(2).replace('.', ',');
+  });
 
-  // Recalcular Investimento Real
-  const realInv1 = (t1 === 'real') ? finalS1 : 0;
-  const realInv2 = (t2 === 'real') ? finalS2 : 0;
-  const realInv3 = (calcState.numBets === 3 && t3 === 'real') ? finalS3 : 0;
+  // Recalcular Investimento Real Total
+  const totalRealInvested = parsedEntries.reduce((acc, e, idx) => {
+    return acc + (e.type === 'real' ? finalStakes[idx] : 0);
+  }, 0);
 
-  const totalRealInvested = realInv1 + realInv2 + realInv3;
-
-  // Recalcular retornos líquidos por cenário após arredondamento
+  // Recalcular retornos por cenário
   const getGrossReturn = (stake, odd, type, comm) => {
     if (stake <= 0) return 0;
-    if (type === 'freebet_snr') {
-      return stake * (odd - 1) * (1 - comm);
-    }
-    if (type === 'freebet_sr') {
-      return stake * odd * (1 - comm);
-    }
-    // Real balance: Gross return received back
+    if (type === 'freebet_snr') return stake * (odd - 1) * (1 - comm);
+    if (type === 'freebet_sr') return stake * odd * (1 - comm);
     return stake + stake * (odd - 1) * (1 - comm);
   };
 
-  const scenarios = [
-    {
-      name: `Vitória ${h1}`,
-      house: h1,
-      stake: finalS1,
-      grossReturn: getGrossReturn(finalS1, o1, t1, c1),
-      netProfit: getGrossReturn(finalS1, o1, t1, c1) - totalRealInvested,
-      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS1, o1, t1, c1) - totalRealInvested) / totalRealInvested * 100) : 100
-    },
-    {
-      name: `Vitória ${h2}`,
-      house: h2,
-      stake: finalS2,
-      grossReturn: getGrossReturn(finalS2, o2, t2, c2),
-      netProfit: getGrossReturn(finalS2, o2, t2, c2) - totalRealInvested,
-      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS2, o2, t2, c2) - totalRealInvested) / totalRealInvested * 100) : 100
-    }
-  ];
+  const scenarios = parsedEntries.map((e, idx) => {
+    const houseName = e.house || `Seleção ${idx + 1}`;
+    const grossReturn = getGrossReturn(finalStakes[idx], e.odd, e.type, e.comm);
+    const netProfit = grossReturn - totalRealInvested;
+    const roi = totalRealInvested > 0 ? (netProfit / totalRealInvested * 100) : 100;
 
-  if (calcState.numBets === 3) {
-    scenarios.push({
-      name: `Vitória ${h3}`,
-      house: h3,
-      stake: finalS3,
-      grossReturn: getGrossReturn(finalS3, o3, t3, c3),
-      netProfit: getGrossReturn(finalS3, o3, t3, c3) - totalRealInvested,
-      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS3, o3, t3, c3) - totalRealInvested) / totalRealInvested * 100) : 100
-    });
-  }
+    return {
+      name: `Vitória ${houseName}`,
+      house: houseName,
+      stake: finalStakes[idx],
+      grossReturn,
+      netProfit,
+      roi
+    };
+  });
 
-  // Média ou Lucro Mínimo para Destaque
   const minNetProfit = Math.min(...scenarios.map(s => s.netProfit));
-  const avgNetProfit = scenarios.reduce((acc, s) => acc + s.netProfit, 0) / scenarios.length;
   const avgGrossReturn = scenarios.reduce((acc, s) => acc + s.grossReturn, 0) / scenarios.length;
   const isPositive = minNetProfit >= 0;
-
-  // Atualizar Card de Resultado
-  const resProfit = document.getElementById('calc-res-profit');
-  const resRoi = document.getElementById('calc-res-roi');
-  const badgeSurebet = document.getElementById('calc-badge-surebet');
-  const resTotalInvested = document.getElementById('calc-res-total-invested');
-  const resAvgPayout = document.getElementById('calc-res-avg-payout');
-  const resModeLabel = document.getElementById('calc-res-mode-label');
 
   if (resProfit) {
     resProfit.textContent = (minNetProfit >= 0 ? '+R$ ' : '-R$ ') + Math.abs(minNetProfit).toFixed(2).replace('.', ',');
@@ -3114,7 +3145,7 @@ function calculateBetTracker() {
 
   if (badgeSurebet) {
     if (calcState.mode === 'freebet') {
-      const freebetRetention = (minNetProfit / (finalS1 || 1)) * 100;
+      const freebetRetention = (minNetProfit / (finalStakes[0] || 1)) * 100;
       badgeSurebet.textContent = `Extração Freebet: ${freebetRetention.toFixed(1)}%`;
       badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
     } else if (isPositive) {
@@ -3128,6 +3159,7 @@ function calculateBetTracker() {
 
   if (resTotalInvested) resTotalInvested.textContent = 'R$ ' + totalRealInvested.toFixed(2).replace('.', ',');
   if (resAvgPayout) resAvgPayout.textContent = 'R$ ' + avgGrossReturn.toFixed(2).replace('.', ',');
+
   if (resModeLabel) {
     const modeNames = {
       surebet: 'Arbitragem Normal',
@@ -3138,8 +3170,6 @@ function calculateBetTracker() {
     resModeLabel.textContent = modeNames[calcState.mode] || 'Calculadora';
   }
 
-  // Renderizar Tabela de Cenários
-  const tbody = document.getElementById('calc-scenarios-tbody');
   if (tbody) {
     tbody.innerHTML = scenarios.map(sc => `
       <tr class="hover:bg-slate-900/40 transition-colors">
@@ -3177,41 +3207,20 @@ function openExportCalcModal() {
   });
   dateSelect.innerHTML = optionsHtml;
 
-  // Gerar preview das apostas que serão salvas
-  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
-  const o1 = document.getElementById('calc-odd-1')?.value || '1.00';
-  const s1 = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
-  const t1 = document.getElementById('calc-type-1')?.value || 'real';
+  // Gerar preview de todas as entradas ativas da calculadora
+  let previewHtml = calcState.entries.map((e, idx) => {
+    const houseName = e.house || `Seleção ${idx + 1}`;
+    const oddVal = parseFloat(e.odd) || 1.00;
+    const stakeVal = e.calculatedStake || 0;
+    const isFreebet = e.type !== 'real';
 
-  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
-  const o2 = document.getElementById('calc-odd-2')?.value || '1.00';
-  const s2 = parseFloat(document.getElementById('calc-stake-2')?.value) || 0;
-  const t2 = document.getElementById('calc-type-2')?.value || 'real';
-
-  let previewHtml = `
-    <div class="flex items-center justify-between py-1 border-b border-slate-800">
-      <span>1. <strong>${h1}</strong> @ ${o1} (${t1 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
-      <span class="font-bold text-slate-100">R$ ${s1.toFixed(2)}</span>
-    </div>
-    <div class="flex items-center justify-between py-1">
-      <span>2. <strong>${h2}</strong> @ ${o2} (${t2 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
-      <span class="font-bold text-slate-100">R$ ${s2.toFixed(2)}</span>
-    </div>
-  `;
-
-  if (calcState.numBets === 3) {
-    const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
-    const o3 = document.getElementById('calc-odd-3')?.value || '1.00';
-    const s3 = parseFloat(document.getElementById('calc-stake-3')?.value) || 0;
-    const t3 = document.getElementById('calc-type-3')?.value || 'real';
-
-    previewHtml += `
-      <div class="flex items-center justify-between py-1 border-t border-slate-800">
-        <span>3. <strong>${h3}</strong> @ ${o3} (${t3 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
-        <span class="font-bold text-slate-100">R$ ${s3.toFixed(2)}</span>
+    return `
+      <div class="flex items-center justify-between py-1 border-b border-slate-800/80">
+        <span>${idx + 1}. <strong>${houseName}</strong> @ ${oddVal.toFixed(2)} (${isFreebet ? 'Freebet' : 'Saldo Real'})</span>
+        <span class="font-bold text-slate-100">R$ ${stakeVal.toFixed(2).replace('.', ',')}</span>
       </div>
     `;
-  }
+  }).join('');
 
   previewList.innerHTML = previewHtml;
   modal.classList.remove('hidden');
@@ -3242,59 +3251,24 @@ async function confirmExportCalcToTracker() {
 
   if (!targetDay.bets) targetDay.bets = [];
 
-  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
-  const o1 = parseFloat(document.getElementById('calc-odd-1')?.value) || 1.01;
-  const s1 = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
-  const t1 = document.getElementById('calc-type-1')?.value || 'real';
+  const newBets = calcState.entries.map((e, idx) => {
+    const houseName = e.house || `Seleção ${idx + 1}`;
+    const oddVal = parseFloat(e.odd) || 1.01;
+    const stakeVal = e.calculatedStake || 0;
+    const isFreebet = e.type !== 'real';
 
-  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
-  const o2 = parseFloat(document.getElementById('calc-odd-2')?.value) || 1.01;
-  const s2 = parseFloat(document.getElementById('calc-stake-2')?.value) || 0;
-  const t2 = document.getElementById('calc-type-2')?.value || 'real';
-
-  const newBets = [
-    {
-      id: Date.now() + '-1',
-      house: h1,
+    return {
+      id: Date.now() + '-' + (idx + 1),
+      house: houseName,
       betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
-      odd: o1,
-      stake: s1,
+      odd: oddVal,
+      stake: stakeVal,
       status: initialStatus,
-      freebet: t1 !== 'real',
-      return: initialStatus === 'green' ? (s1 * o1) : 0,
-      profit: initialStatus === 'green' ? (s1 * (o1 - 1)) : 0
-    },
-    {
-      id: Date.now() + '-2',
-      house: h2,
-      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
-      odd: o2,
-      stake: s2,
-      status: initialStatus,
-      freebet: t2 !== 'real',
-      return: initialStatus === 'green' ? (s2 * o2) : 0,
-      profit: initialStatus === 'green' ? (s2 * (o2 - 1)) : 0
-    }
-  ];
-
-  if (calcState.numBets === 3) {
-    const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
-    const o3 = parseFloat(document.getElementById('calc-odd-3')?.value) || 1.01;
-    const s3 = parseFloat(document.getElementById('calc-stake-3')?.value) || 0;
-    const t3 = document.getElementById('calc-type-3')?.value || 'real';
-
-    newBets.push({
-      id: Date.now() + '-3',
-      house: h3,
-      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
-      odd: o3,
-      stake: s3,
-      status: initialStatus,
-      freebet: t3 !== 'real',
-      return: initialStatus === 'green' ? (s3 * o3) : 0,
-      profit: initialStatus === 'green' ? (s3 * (o3 - 1)) : 0
-    });
-  }
+      freebet: isFreebet,
+      return: initialStatus === 'green' ? (stakeVal * oddVal) : 0,
+      profit: initialStatus === 'green' ? (stakeVal * (oddVal - 1)) : 0
+    };
+  });
 
   targetDay.bets.push(...newBets);
 

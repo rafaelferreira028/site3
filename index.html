@@ -761,39 +761,27 @@
       </div>
 
       <!-- Barra de Configurações Globais da Calculadora -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Alternador 2 Apostas vs 3 Apostas -->
-        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i>
-            <span class="text-xs font-semibold text-slate-300">Número de Entradas</span>
-          </div>
-          <div class="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
-            <button id="calc-num-bets-2" class="px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all">2 Apostas</button>
-            <button id="calc-num-bets-3" class="px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all">3 Apostas</button>
-          </div>
-        </div>
-
-        <!-- Modo de Stake (Stake Total vs Stake Aposta 1) -->
-        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-          <div class="flex items-center gap-2">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Campo: Valor Total a Apostar (R$) -->
+        <div class="glass-card p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-2">
             <i data-lucide="coins" class="w-4 h-4 text-indigo-400"></i>
-            <span class="text-xs font-semibold text-slate-300">Calcular Base em</span>
-          </div>
-          <div class="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
-            <button id="calc-stake-mode-fixed1" class="px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all">Stake Aposta 1</button>
-            <button id="calc-stake-mode-total" class="px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all">Stake Total</button>
+            Valor Total a Apostar (R$)
+          </label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold">R$</span>
+            <input type="number" step="1" min="0" id="calc-total-investment" placeholder="Ex: 100" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs md:text-sm text-slate-100 font-bold focus:border-indigo-500 focus:outline-none">
           </div>
         </div>
 
         <!-- Arredondamento Inteligente -->
-        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-          <div class="flex items-center gap-2">
+        <div class="glass-card p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-2">
             <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
-            <span class="text-xs font-semibold text-slate-300">Arredondar Stakes</span>
-          </div>
-          <select id="calc-rounding-select" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 font-semibold focus:outline-none focus:border-indigo-500">
-            <option value="none">Sem Arredondamento</option>
+            Arredondar Stakes Calculadas
+          </label>
+          <select id="calc-rounding-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-semibold focus:outline-none focus:border-indigo-500">
+            <option value="none">Sem Arredondamento (Exato)</option>
             <option value="1">Inteiro (R$ 1,00)</option>
             <option value="5">Múltiplo de R$ 5,00</option>
             <option value="10">Múltiplo de R$ 10,00</option>
@@ -814,102 +802,17 @@
           </button>
         </div>
 
-        <div class="space-y-4">
-          <!-- Aposta 1 -->
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center">
-            <div class="sm:col-span-3">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção 1</label>
-              <input type="text" id="calc-house-1" value="Bet365 (Casa 1)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
+        <!-- Container Dinâmico das Entradas -->
+        <div id="calc-entries-container" class="space-y-4">
+          <!-- Renderizado via JS dinamicamente com entradas totalmente vazias por padrão -->
+        </div>
 
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Odd Aposta 1</label>
-              <input type="number" step="0.01" min="1.01" id="calc-odd-1" value="2.10" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-3">
-              <label id="calc-label-stake-1" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Valor Stake (R$)</label>
-              <input type="number" step="1" min="0" id="calc-stake-1" value="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 font-bold focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Saldo</label>
-              <select id="calc-type-1" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-                <option value="real">Saldo Real</option>
-                <option value="freebet_snr">Freebet SNR</option>
-                <option value="freebet_sr">Freebet SR</option>
-              </select>
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Comissão (%)</label>
-              <input type="number" step="0.5" min="0" max="100" id="calc-comm-1" value="0" placeholder="0%" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
-          </div>
-
-          <!-- Aposta 2 -->
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center">
-            <div class="sm:col-span-3">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção 2</label>
-              <input type="text" id="calc-house-2" value="Betano (Casa 2)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Odd Aposta 2</label>
-              <input type="number" step="0.01" min="1.01" id="calc-odd-2" value="2.10" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-3">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Calculada (R$)</label>
-              <input type="number" step="0.01" min="0" id="calc-stake-2" value="100" readonly class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:outline-none cursor-not-allowed">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Saldo</label>
-              <select id="calc-type-2" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-                <option value="real">Saldo Real</option>
-                <option value="freebet_snr">Freebet SNR</option>
-                <option value="freebet_sr">Freebet SR</option>
-              </select>
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Comissão (%)</label>
-              <input type="number" step="0.5" min="0" max="100" id="calc-comm-2" value="0" placeholder="0%" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
-          </div>
-
-          <!-- Aposta 3 (Opcional, oculto por padrão) -->
-          <div id="calc-row-3" class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center hidden">
-            <div class="sm:col-span-3">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção 3</label>
-              <input type="text" id="calc-house-3" value="KTO (Casa 3)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Odd Aposta 3</label>
-              <input type="number" step="0.01" min="1.01" id="calc-odd-3" value="3.50" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-indigo-500 focus:outline-none">
-            </div>
-
-            <div class="sm:col-span-3">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Calculada (R$)</label>
-              <input type="number" step="0.01" min="0" id="calc-stake-3" value="0" readonly class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:outline-none cursor-not-allowed">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Saldo</label>
-              <select id="calc-type-3" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
-                <option value="real">Saldo Real</option>
-                <option value="freebet_snr">Freebet SNR</option>
-                <option value="freebet_sr">Freebet SR</option>
-              </select>
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Comissão (%)</label>
-              <input type="number" step="0.5" min="0" max="100" id="calc-comm-3" value="0" placeholder="0%" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-medium focus:border-indigo-500 focus:outline-none">
-            </div>
-          </div>
+        <!-- Botão Adicionar Entrada (+) -->
+        <div class="pt-2">
+          <button id="calc-btn-add-entry" class="px-4 py-2.5 text-xs font-bold bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/30 rounded-xl transition-all flex items-center gap-2 active:scale-95">
+            <i data-lucide="plus" class="w-4 h-4 text-indigo-400"></i>
+            Adicionar Seleção / Entrada
+          </button>
         </div>
       </div>
 
@@ -920,14 +823,14 @@
           <div>
             <div class="flex items-center justify-between text-slate-400 mb-3">
               <span class="text-xs font-bold tracking-wider uppercase">Resultado Estimado</span>
-              <span id="calc-badge-surebet" class="px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Surebet Positiva</span>
+              <span id="calc-badge-surebet" class="px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-slate-800 text-slate-400 border border-slate-700">Aguardando Dados</span>
             </div>
 
             <div class="my-4">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Lucro / Prejuízo Líquido</div>
-              <div id="calc-res-profit" class="text-3xl font-black text-emerald-400 tracking-tight mt-1">R$ 4,76</div>
-              <div id="calc-res-roi" class="text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1">
-                <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> +4.76% de Arbitragem
+              <div id="calc-res-profit" class="text-3xl font-black text-slate-400 tracking-tight mt-1">R$ 0,00</div>
+              <div id="calc-res-roi" class="text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1">
+                <i data-lucide="info" class="w-3.5 h-3.5"></i> Digite o valor total e as odds para calcular
               </div>
             </div>
           </div>
@@ -935,11 +838,11 @@
           <div class="pt-4 border-t border-slate-900/80 space-y-2.5 text-xs text-slate-300">
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Total Investido:</span>
-              <span id="calc-res-total-invested" class="font-bold text-slate-100">R$ 200,00</span>
+              <span id="calc-res-total-invested" class="font-bold text-slate-100">R$ 0,00</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Retorno Bruto Médio:</span>
-              <span id="calc-res-avg-payout" class="font-bold text-slate-100">R$ 204,76</span>
+              <span id="calc-res-avg-payout" class="font-bold text-slate-100">R$ 0,00</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Modo Ativo:</span>
