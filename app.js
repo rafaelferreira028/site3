@@ -2812,7 +2812,7 @@ function renderCalcEntries() {
     const stakeValueDisplay = entry.calculatedStake ? entry.calculatedStake.toFixed(2) : '';
 
     return `
-      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center relative transition-all">
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border ${entry.isLocked ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-800/80'} items-center relative transition-all">
         <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção ${index + 1}</label>
           <input type="text" data-entry-field="house" data-entry-index="${index}" value="${entry.house || ''}" placeholder="${housePlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
@@ -2824,8 +2824,14 @@ function renderCalcEntries() {
         </div>
 
         <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Aposta ${index + 1} (R$)</label>
-          <input type="number" step="0.01" min="0" id="calc-stake-display-${index}" data-entry-field="calculatedStake" data-entry-index="${index}" value="${stakeValueDisplay}" placeholder="Ex: 50.00" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:border-indigo-500 focus:outline-none">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Stake Aposta ${index + 1} (R$)</label>
+            <button type="button" data-lock-entry-index="${index}" class="btn-lock-stake text-[10px] flex items-center gap-1 font-bold transition-all px-2 py-0.5 rounded-md border ${entry.isLocked ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-sm shadow-amber-500/10' : 'text-slate-500 hover:text-slate-300 bg-slate-950 border-slate-800'}" title="${entry.isLocked ? 'Stake Fixa (Trancada). Clique para destrancar.' : 'Trancar valor nesta odd para calcular as outras entradas'}">
+              <i data-lucide="${entry.isLocked ? 'lock' : 'unlock'}" class="w-3 h-3"></i>
+              <span>${entry.isLocked ? 'Trancada' : 'Fixar'}</span>
+            </button>
+          </div>
+          <input type="number" step="0.01" min="0" id="calc-stake-display-${index}" data-entry-field="calculatedStake" data-entry-index="${index}" value="${stakeValueDisplay}" placeholder="Ex: 50.00" class="w-full bg-slate-950 border ${entry.isLocked ? 'border-amber-500/60 ring-1 ring-amber-500/30' : 'border-slate-800'} rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:border-indigo-500 focus:outline-none transition-all">
         </div>
 
         <div class="sm:col-span-2">
@@ -2861,9 +2867,14 @@ function renderCalcEntries() {
     if (field && !isNaN(idx) && calcState.entries[idx]) {
       const handler = (e) => {
         if (field === 'calculatedStake') {
-          calcState.entries[idx].manualStake = parseFloat(e.target.value) || 0;
-          calcState.entries[idx].isManual = true;
-          calcState.entries[idx].calculatedStake = parseFloat(e.target.value) || 0;
+          const val = parseFloat(e.target.value) || 0;
+          calcState.entries[idx].calculatedStake = val;
+          if (calcState.entries[idx].isLocked) {
+            calcState.entries[idx].lockedStake = val;
+          } else {
+            calcState.entries[idx].manualStake = val;
+            calcState.entries[idx].isManual = true;
+          }
         } else {
           calcState.entries[idx][field] = e.target.value;
           if (field === 'odd' || field === 'type') {
@@ -2875,6 +2886,25 @@ function renderCalcEntries() {
       input.addEventListener('input', handler);
       input.addEventListener('change', handler);
     }
+  });
+
+  // Event Listeners dos Botões de Cadeado / Fixar Stake
+  const lockBtns = container.querySelectorAll('[data-lock-entry-index]');
+  lockBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const idx = parseInt(btn.getAttribute('data-lock-entry-index'), 10);
+      if (!isNaN(idx) && calcState.entries[idx]) {
+        calcState.entries[idx].isLocked = !calcState.entries[idx].isLocked;
+        if (calcState.entries[idx].isLocked) {
+          const currentVal = parseFloat(calcState.entries[idx].calculatedStake);
+          calcState.entries[idx].lockedStake = (!isNaN(currentVal) && currentVal > 0) ? currentVal : 100;
+          calcState.entries[idx].calculatedStake = calcState.entries[idx].lockedStake;
+        }
+        renderCalcEntries();
+        calculateBetTracker();
+      }
+    });
   });
 
   // Event Listeners dos Botões de Lixeira / Exclusão
@@ -2915,7 +2945,10 @@ function initBetTrackerCalculator() {
     if (!item.btn) return;
     item.btn.addEventListener('click', () => {
       calcState.mode = item.mode;
-      calcState.entries.forEach(e => e.isManual = false);
+      calcState.entries.forEach(e => {
+        e.isManual = false;
+        e.isLocked = false;
+      });
       modeButtons.forEach(b => {
         if (!b.btn) return;
         if (b.mode === item.mode) {
@@ -2940,11 +2973,16 @@ function initBetTrackerCalculator() {
   const inputTotalInv = document.getElementById('calc-total-investment');
   if (inputTotalInv) {
     inputTotalInv.addEventListener('input', () => {
-      calcState.entries.forEach(e => e.isManual = false);
+      // Se o usuário mexer no Investimento Total, destranca seleções ou recalcula a partir do novo total
+      if (!calcState.entries.some(e => e.isLocked)) {
+        calcState.entries.forEach(e => e.isManual = false);
+      }
       calculateBetTracker();
     });
     inputTotalInv.addEventListener('change', () => {
-      calcState.entries.forEach(e => e.isManual = false);
+      if (!calcState.entries.some(e => e.isLocked)) {
+        calcState.entries.forEach(e => e.isManual = false);
+      }
       calculateBetTracker();
     });
   }
@@ -2954,7 +2992,6 @@ function initBetTrackerCalculator() {
   if (selectRounding) {
     selectRounding.addEventListener('change', (e) => {
       calcState.rounding = e.target.value;
-      calcState.entries.forEach(e => e.isManual = false);
       calculateBetTracker();
     });
   }
@@ -2964,7 +3001,7 @@ function initBetTrackerCalculator() {
   if (btnAddEntry) {
     btnAddEntry.addEventListener('click', () => {
       const nextId = Date.now();
-      calcState.entries.push({ id: nextId, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 });
+      calcState.entries.push({ id: nextId, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0, isLocked: false });
       renderCalcEntries();
       calculateBetTracker();
     });
@@ -2976,8 +3013,8 @@ function initBetTrackerCalculator() {
     btnReset.addEventListener('click', () => {
       if (inputTotalInv) inputTotalInv.value = '';
       calcState.entries = [
-        { id: 1, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 },
-        { id: 2, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 }
+        { id: 1, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0, isLocked: false },
+        { id: 2, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0, isLocked: false }
       ];
       renderCalcEntries();
       calculateBetTracker();
@@ -3032,7 +3069,7 @@ function applyStakeRounding(val, type) {
 }
 
 function calculateBetTracker() {
-  const totalInv = parseFloat(document.getElementById('calc-total-investment')?.value) || 0;
+  let totalInv = parseFloat(document.getElementById('calc-total-investment')?.value) || 0;
 
   // Extração das odds e dados das entradas
   const parsedEntries = calcState.entries.map(e => ({
@@ -3050,12 +3087,11 @@ function calculateBetTracker() {
   const resModeLabel = document.getElementById('calc-res-mode-label');
   const tbody = document.getElementById('calc-scenarios-tbody');
 
-  // Caso os dados estejam incompletos ou sem valor investido (e sem stake manual)
   const hasValidOdds = parsedEntries.every(e => e.odd > 1.0);
 
   if (!hasValidOdds) {
     calcState.entries.forEach((e, idx) => {
-      if (!e.isManual) e.calculatedStake = 0;
+      if (!e.isManual && !e.isLocked) e.calculatedStake = 0;
       const el = document.getElementById(`calc-stake-display-${idx}`);
       if (el && document.activeElement !== el) {
         el.value = e.calculatedStake ? e.calculatedStake.toFixed(2) : '';
@@ -3108,35 +3144,84 @@ function calculateBetTracker() {
 
   const multipliers = parsedEntries.map(e => getMultiplier(e.odd, e.type, e.comm));
 
+  // Verificar se existe alguma entrada trancada com o cadeado (isLocked)
+  const lockedIdx = calcState.entries.findIndex(e => e.isLocked && (parseFloat(e.lockedStake) > 0 || parseFloat(e.calculatedStake) > 0));
+
   let rawStakes = [];
 
-  if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
-    const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
-    rawStakes = multipliers.map(m => totalInv / (m * P));
-  } else if (calcState.mode === 'freebet') {
-    rawStakes[0] = totalInv;
-    const targetNetWin1 = rawStakes[0] * multipliers[0];
-    for (let i = 1; i < parsedEntries.length; i++) {
-      const m = multipliers[i];
-      rawStakes[i] = (m > 1) ? (targetNetWin1 / (m - 1)) : 0;
+  // Função auxiliar para calcular retorno de uma aposta
+  const getGrossReturn = (stake, odd, type, comm) => {
+    if (stake <= 0) return 0;
+    if (type === 'freebet_snr') return stake * (odd - 1) * (1 - comm);
+    if (type === 'freebet_sr') return stake * odd * (1 - comm);
+    return stake + stake * (odd - 1) * (1 - comm);
+  };
+
+  if (lockedIdx !== -1) {
+    // MODO CADEADO ATIVO: A aposta trancada fixa a meta de retorno (Target Net Payout)
+    const lockedEntry = calcState.entries[lockedIdx];
+    const lockedStakeVal = parseFloat(lockedEntry.lockedStake) || parseFloat(lockedEntry.calculatedStake) || 0;
+    const lockedOdd = parsedEntries[lockedIdx].odd;
+    const lockedType = parsedEntries[lockedIdx].type;
+    const lockedComm = parsedEntries[lockedIdx].comm;
+
+    const targetNetWin = getGrossReturn(lockedStakeVal, lockedOdd, lockedType, lockedComm);
+
+    rawStakes = parsedEntries.map((e, idx) => {
+      if (idx === lockedIdx) {
+        return lockedStakeVal;
+      }
+      if (calcState.entries[idx]?.isLocked && parseFloat(calcState.entries[idx]?.lockedStake) > 0) {
+        return parseFloat(calcState.entries[idx].lockedStake);
+      }
+      const m = multipliers[idx];
+      if (m <= 0) return 0;
+      return targetNetWin / m;
+    });
+
+    // Atualizar o input de Investimento Total na interface com a soma das stakes reais calculadas
+    const sumRealInvested = parsedEntries.reduce((acc, e, idx) => {
+      return acc + (e.type === 'real' ? rawStakes[idx] : 0);
+    }, 0);
+
+    const inputTotalInv = document.getElementById('calc-total-investment');
+    if (inputTotalInv && document.activeElement !== inputTotalInv) {
+      inputTotalInv.value = sumRealInvested > 0 ? sumRealInvested.toFixed(2) : '';
     }
-  } else if (calcState.mode === 'riskfree') {
-    rawStakes[0] = totalInv;
-    for (let i = 1; i < parsedEntries.length; i++) {
-      const m = multipliers[i];
-      rawStakes[i] = (m > 1) ? (rawStakes[0] / (m - 1)) : 0;
+
+  } else {
+    // MODO PADRÃO SEM CADEADO: Distribuição regular por Investimento Total
+    if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
+      const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
+      rawStakes = multipliers.map(m => totalInv / (m * P));
+    } else if (calcState.mode === 'freebet') {
+      rawStakes[0] = totalInv;
+      const targetNetWin1 = rawStakes[0] * multipliers[0];
+      for (let i = 1; i < parsedEntries.length; i++) {
+        const m = multipliers[i];
+        rawStakes[i] = (m > 1) ? (targetNetWin1 / (m - 1)) : 0;
+      }
+    } else if (calcState.mode === 'riskfree') {
+      rawStakes[0] = totalInv;
+      for (let i = 1; i < parsedEntries.length; i++) {
+        const m = multipliers[i];
+        rawStakes[i] = (m > 1) ? (rawStakes[0] / (m - 1)) : 0;
+      }
     }
   }
 
-  // Aplicar Arredondamento ou manter override manual se digitado pelo usuário
+  // Aplicar Arredondamento ou manter override manual / trancado
   const finalStakes = rawStakes.map((s, idx) => {
+    if (calcState.entries[idx]?.isLocked && !isNaN(calcState.entries[idx]?.lockedStake)) {
+      return calcState.entries[idx].lockedStake;
+    }
     if (calcState.entries[idx]?.isManual && !isNaN(calcState.entries[idx]?.manualStake)) {
       return calcState.entries[idx].manualStake;
     }
     return Math.max(0, applyStakeRounding(s, calcState.rounding));
   });
 
-  // Atualizar calcState e displays de stake (sem sobresscrever input em foco do usuário)
+  // Atualizar calcState e displays de stake
   finalStakes.forEach((stake, idx) => {
     if (calcState.entries[idx]) calcState.entries[idx].calculatedStake = stake;
     const el = document.getElementById(`calc-stake-display-${idx}`);
@@ -3151,13 +3236,6 @@ function calculateBetTracker() {
   }, 0);
 
   // Recalcular retornos por cenário
-  const getGrossReturn = (stake, odd, type, comm) => {
-    if (stake <= 0) return 0;
-    if (type === 'freebet_snr') return stake * (odd - 1) * (1 - comm);
-    if (type === 'freebet_sr') return stake * odd * (1 - comm);
-    return stake + stake * (odd - 1) * (1 - comm);
-  };
-
   const scenarios = parsedEntries.map((e, idx) => {
     const houseName = e.house || `Seleção ${idx + 1}`;
     const grossReturn = getGrossReturn(finalStakes[idx], e.odd, e.type, e.comm);
