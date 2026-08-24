@@ -3179,16 +3179,6 @@ function calculateBetTracker() {
       return targetNetWin / m;
     });
 
-    // Atualizar o input de Investimento Total na interface com a soma das stakes reais calculadas
-    const sumRealInvested = parsedEntries.reduce((acc, e, idx) => {
-      return acc + (e.type === 'real' ? rawStakes[idx] : 0);
-    }, 0);
-
-    const inputTotalInv = document.getElementById('calc-total-investment');
-    if (inputTotalInv && document.activeElement !== inputTotalInv) {
-      inputTotalInv.value = sumRealInvested > 0 ? sumRealInvested.toFixed(2) : '';
-    }
-
   } else {
     // MODO PADRÃO SEM CADEADO: Distribuição regular por Investimento Total
     if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
@@ -3226,14 +3216,22 @@ function calculateBetTracker() {
     if (calcState.entries[idx]) calcState.entries[idx].calculatedStake = stake;
     const el = document.getElementById(`calc-stake-display-${idx}`);
     if (el && document.activeElement !== el) {
-      el.value = stake > 0 ? stake.toFixed(2) : '';
+      el.value = stake > 0 ? (calcState.rounding !== 'none' ? stake.toFixed(0) : stake.toFixed(2)) : '';
     }
   });
 
-  // Recalcular Investimento Real Total
+  // Recalcular Investimento Real Total a partir das stakes FINAIS (arredondadas)
   const totalRealInvested = parsedEntries.reduce((acc, e, idx) => {
     return acc + (e.type === 'real' ? finalStakes[idx] : 0);
   }, 0);
+
+  // Se o modo cadeado estiver ativo, atualizar o campo "Valor Total a Apostar" com a soma exata das stakes reais arredondadas
+  if (lockedIdx !== -1) {
+    const inputTotalInv = document.getElementById('calc-total-investment');
+    if (inputTotalInv && document.activeElement !== inputTotalInv) {
+      inputTotalInv.value = totalRealInvested > 0 ? (calcState.rounding !== 'none' ? totalRealInvested.toFixed(0) : totalRealInvested.toFixed(2)) : '';
+    }
+  }
 
   // Recalcular retornos por cenário
   const scenarios = parsedEntries.map((e, idx) => {
