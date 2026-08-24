@@ -2662,9 +2662,10 @@ function printBetsSummaryReport() {
   printWindow.document.close();
 }
 
-// Tab Switching Listener
+// Tab Switching Listener & Hash Routing
 const tabDashboard = document.getElementById('tab-dashboard');
 const tabBetsSummary = document.getElementById('tab-bets-summary');
+const tabCalculator = document.getElementById('tab-calculator');
 const tabHistory = document.getElementById('tab-history');
 const tabNotes = document.getElementById('tab-notes');
 const tabFreebets = document.getElementById('tab-freebets');
@@ -2673,6 +2674,7 @@ const btnFreebetHeaderCount = document.getElementById('freebet-count');
 
 const contentDashboard = document.getElementById('content-dashboard');
 const contentBetsSummary = document.getElementById('content-bets-summary');
+const contentCalculator = document.getElementById('content-calculator');
 const contentHistory = document.getElementById('content-history');
 const contentNotes = document.getElementById('content-notes');
 const contentFreebets = document.getElementById('content-freebets');
@@ -2680,79 +2682,629 @@ const inputSearchFreebetDays = document.getElementById('input-search-freebet-day
 
 function deactivateAllTabs() {
   closeMobileMenu();
-  if (tabDashboard) tabDashboard.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
-  if (tabBetsSummary) tabBetsSummary.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
-  if (tabHistory) tabHistory.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
-  if (tabNotes) tabNotes.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
-  if (tabFreebets) tabFreebets.className = "px-5 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-205 -mb-px transition-colors flex items-center gap-2";
+  const inactiveClass = "px-4 md:px-5 py-3 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors flex items-center gap-2 shrink-0";
+  if (tabDashboard) tabDashboard.className = inactiveClass;
+  if (tabBetsSummary) tabBetsSummary.className = inactiveClass;
+  if (tabCalculator) tabCalculator.className = inactiveClass;
+  if (tabHistory) tabHistory.className = inactiveClass;
+  if (tabNotes) tabNotes.className = inactiveClass;
+  if (tabFreebets) tabFreebets.className = inactiveClass;
   
   if (contentDashboard) contentDashboard.classList.add('hidden');
   if (contentBetsSummary) contentBetsSummary.classList.add('hidden');
+  if (contentCalculator) contentCalculator.classList.add('hidden');
   if (contentHistory) contentHistory.classList.add('hidden');
   if (contentNotes) contentNotes.classList.add('hidden');
   if (contentFreebets) contentFreebets.classList.add('hidden');
 }
 
+const activeTabClass = "px-4 md:px-5 py-3 text-xs md:text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2 shrink-0";
+
+function activateDashboardTab() {
+  deactivateAllTabs();
+  if (tabDashboard) tabDashboard.className = activeTabClass;
+  if (contentDashboard) contentDashboard.classList.remove('hidden');
+  if (window.location.hash !== '#dashboard') window.location.hash = 'dashboard';
+}
+
+function activateBetsSummaryTab() {
+  deactivateAllTabs();
+  if (tabBetsSummary) tabBetsSummary.className = activeTabClass;
+  if (contentBetsSummary) contentBetsSummary.classList.remove('hidden');
+  renderBetsSummary();
+  if (window.location.hash !== '#bets-summary') window.location.hash = 'bets-summary';
+}
+
+function activateCalculatorTab() {
+  deactivateAllTabs();
+  if (tabCalculator) tabCalculator.className = activeTabClass;
+  if (contentCalculator) contentCalculator.classList.remove('hidden');
+  if (typeof calculateBetTracker === 'function') calculateBetTracker();
+  if (window.location.hash !== '#calculator') window.location.hash = 'calculator';
+}
+
+function activateHistoryTab() {
+  deactivateAllTabs();
+  if (tabHistory) tabHistory.className = activeTabClass;
+  if (contentHistory) contentHistory.classList.remove('hidden');
+  renderHistory();
+  if (window.location.hash !== '#history') window.location.hash = 'history';
+}
+
 function activateNotesTab() {
   deactivateAllTabs();
-  if (tabNotes) tabNotes.className = "px-5 py-3 text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2";
+  if (tabNotes) tabNotes.className = activeTabClass;
   if (contentNotes) contentNotes.classList.remove('hidden');
   renderDailyNotes(inputSearchNotes ? inputSearchNotes.value : '');
+  if (window.location.hash !== '#notes') window.location.hash = 'notes';
 }
 
 function activateFreebetsTab() {
   deactivateAllTabs();
-  if (tabFreebets) tabFreebets.className = "px-5 py-3 text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2";
+  if (tabFreebets) tabFreebets.className = activeTabClass;
   if (contentFreebets) contentFreebets.classList.remove('hidden');
   renderFreebetDays(inputSearchFreebetDays ? inputSearchFreebetDays.value : '');
+  if (window.location.hash !== '#freebets') window.location.hash = 'freebets';
 }
 
-if (tabDashboard) {
-  tabDashboard.addEventListener('click', () => {
-    deactivateAllTabs();
-    tabDashboard.className = "px-5 py-3 text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2";
-    contentDashboard.classList.remove('hidden');
-  });
+// Hash Routing Handler
+function handleHashNavigation() {
+  const hash = window.location.hash.toLowerCase();
+  if (hash === '#calculator') {
+    activateCalculatorTab();
+  } else if (hash === '#bets-summary') {
+    activateBetsSummaryTab();
+  } else if (hash === '#history') {
+    activateHistoryTab();
+  } else if (hash === '#notes') {
+    activateNotesTab();
+  } else if (hash === '#freebets') {
+    activateFreebetsTab();
+  } else {
+    // Default or #dashboard
+    if (contentDashboard && contentDashboard.classList.contains('hidden')) {
+      activateDashboardTab();
+    }
+  }
 }
 
-if (tabBetsSummary) {
-  tabBetsSummary.addEventListener('click', () => {
-    deactivateAllTabs();
-    tabBetsSummary.className = "px-5 py-3 text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2";
-    contentBetsSummary.classList.remove('hidden');
-    renderBetsSummary();
-  });
-}
+window.addEventListener('hashchange', handleHashNavigation);
 
-if (tabHistory) {
-  tabHistory.addEventListener('click', () => {
-    deactivateAllTabs();
-    tabHistory.className = "px-5 py-3 text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2";
-    contentHistory.classList.remove('hidden');
-    renderHistory();
-  });
-}
+if (tabDashboard) tabDashboard.addEventListener('click', activateDashboardTab);
+if (tabBetsSummary) tabBetsSummary.addEventListener('click', activateBetsSummaryTab);
+if (tabCalculator) tabCalculator.addEventListener('click', activateCalculatorTab);
+if (tabHistory) tabHistory.addEventListener('click', activateHistoryTab);
+if (tabNotes) tabNotes.addEventListener('click', activateNotesTab);
+if (tabFreebets) tabFreebets.addEventListener('click', activateFreebetsTab);
 
-if (tabNotes) {
-  tabNotes.addEventListener('click', activateNotesTab);
-}
-
-if (tabFreebets) {
-  tabFreebets.addEventListener('click', activateFreebetsTab);
-}
-
-if (btnHeaderNotes) {
-  btnHeaderNotes.addEventListener('click', activateNotesTab);
-}
-
-if (btnFreebetHeaderCount) {
-  btnFreebetHeaderCount.addEventListener('click', activateFreebetsTab);
-}
+if (btnHeaderNotes) btnHeaderNotes.addEventListener('click', activateNotesTab);
+if (btnFreebetHeaderCount) btnFreebetHeaderCount.addEventListener('click', activateFreebetsTab);
 
 if (inputSearchFreebetDays) {
   inputSearchFreebetDays.addEventListener('input', (e) => {
     renderFreebetDays(e.target.value);
   });
+}
+
+// ==========================================
+// CALCULADORA BET TRACKER (MOTOR DE CÁLCULO)
+// ==========================================
+
+let calcState = {
+  mode: 'surebet', // 'surebet' | 'freebet' | 'dutching' | 'riskfree'
+  numBets: 2,     // 2 | 3
+  stakeMode: 'fixed1', // 'fixed1' | 'total'
+  rounding: 'none' // 'none' | '1' | '5' | '10'
+};
+
+function initBetTrackerCalculator() {
+  // Selectores de Modo
+  const btnModeSurebet = document.getElementById('calc-mode-surebet');
+  const btnModeFreebet = document.getElementById('calc-mode-freebet');
+  const btnModeDutching = document.getElementById('calc-mode-dutching');
+  const btnModeRiskfree = document.getElementById('calc-mode-riskfree');
+
+  const modeButtons = [
+    { btn: btnModeSurebet, mode: 'surebet', name: 'Surebet & Arbitragem' },
+    { btn: btnModeFreebet, mode: 'freebet', name: 'Freebet (SNR/SR)' },
+    { btn: btnModeDutching, mode: 'dutching', name: 'Dutching' },
+    { btn: btnModeRiskfree, mode: 'riskfree', name: 'Sem Risco / Equalizar' }
+  ];
+
+  modeButtons.forEach(item => {
+    if (!item.btn) return;
+    item.btn.addEventListener('click', () => {
+      calcState.mode = item.mode;
+      modeButtons.forEach(b => {
+        if (!b.btn) return;
+        if (b.mode === item.mode) {
+          b.btn.className = "calc-mode-btn px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-md transition-all flex items-center gap-1.5 shrink-0";
+        } else {
+          b.btn.className = "calc-mode-btn px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-1.5 shrink-0";
+        }
+      });
+      const badge = document.getElementById('calc-current-mode-badge');
+      if (badge) badge.textContent = item.name;
+
+      // Se mudar para freebet, predefinir aposta 1 como freebet SNR se estiver como real
+      if (item.mode === 'freebet') {
+        const type1 = document.getElementById('calc-type-1');
+        if (type1 && type1.value === 'real') type1.value = 'freebet_snr';
+      }
+
+      calculateBetTracker();
+    });
+  });
+
+  // Alternador 2 vs 3 Apostas
+  const btnNum2 = document.getElementById('calc-num-bets-2');
+  const btnNum3 = document.getElementById('calc-num-bets-3');
+  const row3 = document.getElementById('calc-row-3');
+
+  if (btnNum2 && btnNum3) {
+    btnNum2.addEventListener('click', () => {
+      calcState.numBets = 2;
+      btnNum2.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
+      btnNum3.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
+      if (row3) row3.classList.add('hidden');
+      calculateBetTracker();
+    });
+
+    btnNum3.addEventListener('click', () => {
+      calcState.numBets = 3;
+      btnNum3.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
+      btnNum2.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
+      if (row3) row3.classList.remove('hidden');
+      calculateBetTracker();
+    });
+  }
+
+  // Alternador Stake Mode (Aposta 1 vs Total)
+  const btnStakeFixed1 = document.getElementById('calc-stake-mode-fixed1');
+  const btnStakeTotal = document.getElementById('calc-stake-mode-total');
+  const labelStake1 = document.getElementById('calc-label-stake-1');
+
+  if (btnStakeFixed1 && btnStakeTotal) {
+    btnStakeFixed1.addEventListener('click', () => {
+      calcState.stakeMode = 'fixed1';
+      btnStakeFixed1.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
+      btnStakeTotal.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
+      if (labelStake1) labelStake1.textContent = "Valor Stake (R$)";
+      calculateBetTracker();
+    });
+
+    btnStakeTotal.addEventListener('click', () => {
+      calcState.stakeMode = 'total';
+      btnStakeTotal.className = "px-3 py-1 text-xs font-bold rounded-md bg-indigo-600 text-white transition-all";
+      btnStakeFixed1.className = "px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 rounded-md transition-all";
+      if (labelStake1) labelStake1.textContent = "Stake Total Evento (R$)";
+      calculateBetTracker();
+    });
+  }
+
+  // Arredondamento Select
+  const selectRounding = document.getElementById('calc-rounding-select');
+  if (selectRounding) {
+    selectRounding.addEventListener('change', (e) => {
+      calcState.rounding = e.target.value;
+      calculateBetTracker();
+    });
+  }
+
+  // Input Listeners para recalcular em tempo real
+  const inputsToListen = [
+    'calc-odd-1', 'calc-stake-1', 'calc-type-1', 'calc-comm-1', 'calc-house-1',
+    'calc-odd-2', 'calc-type-2', 'calc-comm-2', 'calc-house-2',
+    'calc-odd-3', 'calc-type-3', 'calc-comm-3', 'calc-house-3'
+  ];
+
+  inputsToListen.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', calculateBetTracker);
+      el.addEventListener('change', calculateBetTracker);
+    }
+  });
+
+  // Botão Limpar / Reset
+  const btnReset = document.getElementById('calc-btn-reset');
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      const odd1 = document.getElementById('calc-odd-1');
+      const stake1 = document.getElementById('calc-stake-1');
+      const odd2 = document.getElementById('calc-odd-2');
+      const odd3 = document.getElementById('calc-odd-3');
+      const house1 = document.getElementById('calc-house-1');
+      const house2 = document.getElementById('calc-house-2');
+      const house3 = document.getElementById('calc-house-3');
+
+      if (odd1) odd1.value = '2.10';
+      if (stake1) stake1.value = '100';
+      if (odd2) odd2.value = '2.10';
+      if (odd3) odd3.value = '3.50';
+      if (house1) house1.value = 'Bet365 (Casa 1)';
+      if (house2) house2.value = 'Betano (Casa 2)';
+      if (house3) house3.value = 'KTO (Casa 3)';
+
+      calculateBetTracker();
+    });
+  }
+
+  // Botão Exportar para Planilha
+  const btnExportSheet = document.getElementById('calc-btn-export-sheet');
+  if (btnExportSheet) {
+    btnExportSheet.addEventListener('click', openExportCalcModal);
+  }
+
+  // Modal Export Listeners
+  const modalClose = document.getElementById('modal-calc-export-close');
+  const modalCancel = document.getElementById('modal-calc-export-cancel');
+  const modalConfirm = document.getElementById('modal-calc-export-confirm');
+
+  if (modalClose) modalClose.addEventListener('click', closeExportCalcModal);
+  if (modalCancel) modalCancel.addEventListener('click', closeExportCalcModal);
+  if (modalConfirm) modalConfirm.addEventListener('click', confirmExportCalcToTracker);
+}
+
+function applyStakeRounding(val, type) {
+  if (type === '1') return Math.round(val);
+  if (type === '5') return Math.round(val / 5) * 5 || 5;
+  if (type === '10') return Math.round(val / 10) * 10 || 10;
+  return val;
+}
+
+function calculateBetTracker() {
+  const o1 = parseFloat(document.getElementById('calc-odd-1')?.value) || 1.01;
+  const o2 = parseFloat(document.getElementById('calc-odd-2')?.value) || 1.01;
+  const o3 = parseFloat(document.getElementById('calc-odd-3')?.value) || 1.01;
+
+  let baseInputVal = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
+
+  const t1 = document.getElementById('calc-type-1')?.value || 'real';
+  const t2 = document.getElementById('calc-type-2')?.value || 'real';
+  const t3 = document.getElementById('calc-type-3')?.value || 'real';
+
+  const c1 = (parseFloat(document.getElementById('calc-comm-1')?.value) || 0) / 100;
+  const c2 = (parseFloat(document.getElementById('calc-comm-2')?.value) || 0) / 100;
+  const c3 = (parseFloat(document.getElementById('calc-comm-3')?.value) || 0) / 100;
+
+  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
+  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
+  const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
+
+  // Fator multiplicador líquido por aposta
+  const getMultiplier = (odd, type, comm) => {
+    if (type === 'freebet_snr') {
+      return (odd - 1) * (1 - comm);
+    }
+    if (type === 'freebet_sr') {
+      return odd * (1 - comm);
+    }
+    // Saldo Real
+    return 1 + (odd - 1) * (1 - comm);
+  };
+
+  const e1 = getMultiplier(o1, t1, c1);
+  const e2 = getMultiplier(o2, t2, c2);
+  const e3 = getMultiplier(o3, t3, c3);
+
+  let rawS1 = 0, rawS2 = 0, rawS3 = 0;
+
+  if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
+    const P = (1 / e1) + (1 / e2) + (calcState.numBets === 3 ? (1 / e3) : 0);
+    if (calcState.stakeMode === 'fixed1') {
+      rawS1 = baseInputVal;
+      const targetPayout = rawS1 * e1;
+      rawS2 = targetPayout / e2;
+      rawS3 = calcState.numBets === 3 ? (targetPayout / e3) : 0;
+    } else {
+      // Stake Total
+      const totalS = baseInputVal;
+      rawS1 = totalS / (e1 * P);
+      rawS2 = totalS / (e2 * P);
+      rawS3 = calcState.numBets === 3 ? (totalS / (e3 * P)) : 0;
+    }
+  } else if (calcState.mode === 'freebet') {
+    // Aposta 1 é a Freebet
+    rawS1 = baseInputVal;
+    const targetNetWin1 = rawS1 * e1; // Lucro líquido se aposta 1 (Freebet) vencer
+    // Para Aposta 2 (Saldo Real) equalizar lucro:
+    // S2 * e2 - S2 = TargetNetWin1 => S2 * (e2 - 1) = TargetNetWin1
+    rawS2 = (e2 > 1) ? (targetNetWin1 / (e2 - 1)) : 0;
+    if (calcState.numBets === 3) {
+      rawS3 = (e3 > 1) ? (targetNetWin1 / (e3 - 1)) : 0;
+    } else {
+      rawS3 = 0;
+    }
+  } else if (calcState.mode === 'riskfree') {
+    // Sem Risco na Aposta 1 (se Aposta 1 perder, Aposta 2 cobre a Stake 1)
+    rawS1 = baseInputVal;
+    rawS2 = (e2 > 1) ? (rawS1 / (e2 - 1)) : 0;
+    rawS3 = (calcState.numBets === 3 && e3 > 1) ? (rawS1 / (e3 - 1)) : 0;
+  }
+
+  // Aplicar Arredondamento
+  let finalS1 = Math.max(0, rawS1);
+  let finalS2 = Math.max(0, applyStakeRounding(rawS2, calcState.rounding));
+  let finalS3 = calcState.numBets === 3 ? Math.max(0, applyStakeRounding(rawS3, calcState.rounding)) : 0;
+
+  // Atualizar inputs read-only das stakes 2 e 3 na interface
+  const inputStake2 = document.getElementById('calc-stake-2');
+  const inputStake3 = document.getElementById('calc-stake-3');
+  if (inputStake2) inputStake2.value = finalS2.toFixed(2);
+  if (inputStake3) inputStake3.value = finalS3.toFixed(2);
+
+  // Recalcular Investimento Real
+  const realInv1 = (t1 === 'real') ? finalS1 : 0;
+  const realInv2 = (t2 === 'real') ? finalS2 : 0;
+  const realInv3 = (calcState.numBets === 3 && t3 === 'real') ? finalS3 : 0;
+
+  const totalRealInvested = realInv1 + realInv2 + realInv3;
+
+  // Recalcular retornos líquidos por cenário após arredondamento
+  const getGrossReturn = (stake, odd, type, comm) => {
+    if (stake <= 0) return 0;
+    if (type === 'freebet_snr') {
+      return stake * (odd - 1) * (1 - comm);
+    }
+    if (type === 'freebet_sr') {
+      return stake * odd * (1 - comm);
+    }
+    // Real balance: Gross return received back
+    return stake + stake * (odd - 1) * (1 - comm);
+  };
+
+  const scenarios = [
+    {
+      name: `Vitória ${h1}`,
+      house: h1,
+      stake: finalS1,
+      grossReturn: getGrossReturn(finalS1, o1, t1, c1),
+      netProfit: getGrossReturn(finalS1, o1, t1, c1) - totalRealInvested,
+      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS1, o1, t1, c1) - totalRealInvested) / totalRealInvested * 100) : 100
+    },
+    {
+      name: `Vitória ${h2}`,
+      house: h2,
+      stake: finalS2,
+      grossReturn: getGrossReturn(finalS2, o2, t2, c2),
+      netProfit: getGrossReturn(finalS2, o2, t2, c2) - totalRealInvested,
+      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS2, o2, t2, c2) - totalRealInvested) / totalRealInvested * 100) : 100
+    }
+  ];
+
+  if (calcState.numBets === 3) {
+    scenarios.push({
+      name: `Vitória ${h3}`,
+      house: h3,
+      stake: finalS3,
+      grossReturn: getGrossReturn(finalS3, o3, t3, c3),
+      netProfit: getGrossReturn(finalS3, o3, t3, c3) - totalRealInvested,
+      roi: totalRealInvested > 0 ? ((getGrossReturn(finalS3, o3, t3, c3) - totalRealInvested) / totalRealInvested * 100) : 100
+    });
+  }
+
+  // Média ou Lucro Mínimo para Destaque
+  const minNetProfit = Math.min(...scenarios.map(s => s.netProfit));
+  const avgNetProfit = scenarios.reduce((acc, s) => acc + s.netProfit, 0) / scenarios.length;
+  const avgGrossReturn = scenarios.reduce((acc, s) => acc + s.grossReturn, 0) / scenarios.length;
+  const isPositive = minNetProfit >= 0;
+
+  // Atualizar Card de Resultado
+  const resProfit = document.getElementById('calc-res-profit');
+  const resRoi = document.getElementById('calc-res-roi');
+  const badgeSurebet = document.getElementById('calc-badge-surebet');
+  const resTotalInvested = document.getElementById('calc-res-total-invested');
+  const resAvgPayout = document.getElementById('calc-res-avg-payout');
+  const resModeLabel = document.getElementById('calc-res-mode-label');
+
+  if (resProfit) {
+    resProfit.textContent = (minNetProfit >= 0 ? '+R$ ' : '-R$ ') + Math.abs(minNetProfit).toFixed(2).replace('.', ',');
+    resProfit.className = minNetProfit >= 0 ? "text-3xl font-black text-emerald-400 tracking-tight mt-1" : "text-3xl font-black text-rose-400 tracking-tight mt-1";
+  }
+
+  if (resRoi) {
+    const minRoi = totalRealInvested > 0 ? (minNetProfit / totalRealInvested * 100) : 100;
+    const roiFormatted = (minRoi >= 0 ? '+' : '') + minRoi.toFixed(2) + '%';
+    resRoi.innerHTML = minRoi >= 0 
+      ? `<i data-lucide="trending-up" class="w-3.5 h-3.5"></i> ${roiFormatted} de Arbitragem`
+      : `<i data-lucide="trending-down" class="w-3.5 h-3.5"></i> ${roiFormatted} de Margem`;
+    resRoi.className = minRoi >= 0 ? "text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1" : "text-xs font-bold text-rose-400 mt-1 flex items-center gap-1";
+  }
+
+  if (badgeSurebet) {
+    if (calcState.mode === 'freebet') {
+      const freebetRetention = (minNetProfit / (finalS1 || 1)) * 100;
+      badgeSurebet.textContent = `Extração Freebet: ${freebetRetention.toFixed(1)}%`;
+      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+    } else if (isPositive) {
+      badgeSurebet.textContent = "Surebet Positiva";
+      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+    } else {
+      badgeSurebet.textContent = "Prejuízo / Sem Arbitragem";
+      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30";
+    }
+  }
+
+  if (resTotalInvested) resTotalInvested.textContent = 'R$ ' + totalRealInvested.toFixed(2).replace('.', ',');
+  if (resAvgPayout) resAvgPayout.textContent = 'R$ ' + avgGrossReturn.toFixed(2).replace('.', ',');
+  if (resModeLabel) {
+    const modeNames = {
+      surebet: 'Arbitragem Normal',
+      freebet: 'Extração de Freebet',
+      dutching: 'Dutching Proporcional',
+      riskfree: 'Aposta Sem Risco'
+    };
+    resModeLabel.textContent = modeNames[calcState.mode] || 'Calculadora';
+  }
+
+  // Renderizar Tabela de Cenários
+  const tbody = document.getElementById('calc-scenarios-tbody');
+  if (tbody) {
+    tbody.innerHTML = scenarios.map(sc => `
+      <tr class="hover:bg-slate-900/40 transition-colors">
+        <td class="py-3 px-3 font-semibold text-slate-200">${sc.name}</td>
+        <td class="py-3 px-3 text-slate-300 font-medium">R$ ${sc.stake.toFixed(2).replace('.', ',')}</td>
+        <td class="py-3 px-3 text-emerald-400 font-bold">R$ ${sc.grossReturn.toFixed(2).replace('.', ',')}</td>
+        <td class="py-3 px-3 font-extrabold ${sc.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+          ${sc.netProfit >= 0 ? '+' : ''}R$ ${sc.netProfit.toFixed(2).replace('.', ',')}
+        </td>
+        <td class="py-3 px-3 text-right font-bold ${sc.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+          ${sc.roi >= 0 ? '+' : ''}${sc.roi.toFixed(2)}%
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// Modal Exportar Entradas para Planilha
+function openExportCalcModal() {
+  const modal = document.getElementById('modal-export-calc');
+  const dateSelect = document.getElementById('modal-calc-export-date-select');
+  const previewList = document.getElementById('modal-calc-preview-list');
+  if (!modal || !dateSelect || !previewList) return;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const existingDays = (trackerData.days || []).map(d => d.date);
+
+  let optionsHtml = `<option value="${todayStr}">Hoje (${formatDateDisplay(todayStr)})</option>`;
+  existingDays.forEach(d => {
+    if (d !== todayStr) {
+      optionsHtml += `<option value="${d}">${formatDateDisplay(d)}</option>`;
+    }
+  });
+  dateSelect.innerHTML = optionsHtml;
+
+  // Gerar preview das apostas que serão salvas
+  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
+  const o1 = document.getElementById('calc-odd-1')?.value || '1.00';
+  const s1 = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
+  const t1 = document.getElementById('calc-type-1')?.value || 'real';
+
+  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
+  const o2 = document.getElementById('calc-odd-2')?.value || '1.00';
+  const s2 = parseFloat(document.getElementById('calc-stake-2')?.value) || 0;
+  const t2 = document.getElementById('calc-type-2')?.value || 'real';
+
+  let previewHtml = `
+    <div class="flex items-center justify-between py-1 border-b border-slate-800">
+      <span>1. <strong>${h1}</strong> @ ${o1} (${t1 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
+      <span class="font-bold text-slate-100">R$ ${s1.toFixed(2)}</span>
+    </div>
+    <div class="flex items-center justify-between py-1">
+      <span>2. <strong>${h2}</strong> @ ${o2} (${t2 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
+      <span class="font-bold text-slate-100">R$ ${s2.toFixed(2)}</span>
+    </div>
+  `;
+
+  if (calcState.numBets === 3) {
+    const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
+    const o3 = document.getElementById('calc-odd-3')?.value || '1.00';
+    const s3 = parseFloat(document.getElementById('calc-stake-3')?.value) || 0;
+    const t3 = document.getElementById('calc-type-3')?.value || 'real';
+
+    previewHtml += `
+      <div class="flex items-center justify-between py-1 border-t border-slate-800">
+        <span>3. <strong>${h3}</strong> @ ${o3} (${t3 === 'real' ? 'Saldo Real' : 'Freebet'})</span>
+        <span class="font-bold text-slate-100">R$ ${s3.toFixed(2)}</span>
+      </div>
+    `;
+  }
+
+  previewList.innerHTML = previewHtml;
+  modal.classList.remove('hidden');
+}
+
+function closeExportCalcModal() {
+  const modal = document.getElementById('modal-export-calc');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function confirmExportCalcToTracker() {
+  const dateSelect = document.getElementById('modal-calc-export-date-select');
+  const statusSelect = document.getElementById('modal-calc-export-status');
+  if (!dateSelect || !statusSelect) return;
+
+  const targetDate = dateSelect.value;
+  const initialStatus = statusSelect.value; // 'pending' | 'green'
+
+  let targetDay = trackerData.days.find(d => d.date === targetDate);
+  if (!targetDay) {
+    targetDay = {
+      date: targetDate,
+      initialBalance: globalBalance || 0,
+      bets: []
+    };
+    trackerData.days.push(targetDay);
+  }
+
+  if (!targetDay.bets) targetDay.bets = [];
+
+  const h1 = document.getElementById('calc-house-1')?.value || 'Casa 1';
+  const o1 = parseFloat(document.getElementById('calc-odd-1')?.value) || 1.01;
+  const s1 = parseFloat(document.getElementById('calc-stake-1')?.value) || 0;
+  const t1 = document.getElementById('calc-type-1')?.value || 'real';
+
+  const h2 = document.getElementById('calc-house-2')?.value || 'Casa 2';
+  const o2 = parseFloat(document.getElementById('calc-odd-2')?.value) || 1.01;
+  const s2 = parseFloat(document.getElementById('calc-stake-2')?.value) || 0;
+  const t2 = document.getElementById('calc-type-2')?.value || 'real';
+
+  const newBets = [
+    {
+      id: Date.now() + '-1',
+      house: h1,
+      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
+      odd: o1,
+      stake: s1,
+      status: initialStatus,
+      freebet: t1 !== 'real',
+      return: initialStatus === 'green' ? (s1 * o1) : 0,
+      profit: initialStatus === 'green' ? (s1 * (o1 - 1)) : 0
+    },
+    {
+      id: Date.now() + '-2',
+      house: h2,
+      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
+      odd: o2,
+      stake: s2,
+      status: initialStatus,
+      freebet: t2 !== 'real',
+      return: initialStatus === 'green' ? (s2 * o2) : 0,
+      profit: initialStatus === 'green' ? (s2 * (o2 - 1)) : 0
+    }
+  ];
+
+  if (calcState.numBets === 3) {
+    const h3 = document.getElementById('calc-house-3')?.value || 'Casa 3';
+    const o3 = parseFloat(document.getElementById('calc-odd-3')?.value) || 1.01;
+    const s3 = parseFloat(document.getElementById('calc-stake-3')?.value) || 0;
+    const t3 = document.getElementById('calc-type-3')?.value || 'real';
+
+    newBets.push({
+      id: Date.now() + '-3',
+      house: h3,
+      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
+      odd: o3,
+      stake: s3,
+      status: initialStatus,
+      freebet: t3 !== 'real',
+      return: initialStatus === 'green' ? (s3 * o3) : 0,
+      profit: initialStatus === 'green' ? (s3 * (o3 - 1)) : 0
+    });
+  }
+
+  targetDay.bets.push(...newBets);
+
+  closeExportCalcModal();
+  await saveData();
+  renderAllDays();
+  updateGlobalCapital();
+
+  // Ir para a aba Dashboard para ver as entradas inseridas
+  activateDashboardTab();
 }
 
 // ==========================================
@@ -3607,6 +4159,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderAllDays();
   updateGlobalCapital();
   setDefaultNoteDate();
+
+  // Inicializar Calculadora Bet Tracker & Roteamento de Hash URL
+  initBetTrackerCalculator();
+  handleHashNavigation();
 
   // Menu Mobile Listener
   const btnMobileMenuToggle = document.getElementById('btn-mobile-menu-toggle');
