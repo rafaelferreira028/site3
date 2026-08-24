@@ -280,6 +280,14 @@ function formatCurrency(value) {
 // CALCULATION LOGIC
 // ==========================================
 
+// Helper to get green profit multiplier factor (1.0 for 100%, custom % if entered)
+function getGreenFactor(bet) {
+  if (bet.greenPercent !== undefined && bet.greenPercent !== null && bet.greenPercent !== '' && !isNaN(bet.greenPercent)) {
+    return parseFloat(bet.greenPercent) / 100;
+  }
+  return 1;
+}
+
 // Update calculations for a specific bet row DOM element and save values
 function updateBetCalculations(dayId, betId, rowElement) {
   const day = trackerData.days.find(d => d.id === dayId);
@@ -294,6 +302,7 @@ function updateBetCalculations(dayId, betId, rowElement) {
   const freebetBtn = rowElement.querySelector('[data-field="freebet"]');
   const boostBtn = rowElement.querySelector('[data-field="boostActive"]');
   const boostInput = rowElement.querySelector('[data-field="boostPercent"]');
+  const greenPercentInput = rowElement.querySelector('[data-field="greenPercent"]');
   const exchangeBtn = rowElement.querySelector('[data-field="exchangeType"]');
 
   // Update object properties in memory
@@ -304,10 +313,12 @@ function updateBetCalculations(dayId, betId, rowElement) {
   bet.freebet = freebetBtn && freebetBtn.getAttribute('data-active') === 'true';
   bet.boostActive = boostBtn && boostBtn.getAttribute('data-active') === 'true';
   bet.boostPercent = parseFloat(boostInput ? boostInput.value : 0) || 0;
+  bet.greenPercent = (greenPercentInput && greenPercentInput.value !== '') ? parseFloat(greenPercentInput.value) : undefined;
   bet.exchangeType = (exchangeBtn && exchangeBtn.getAttribute('data-exchange-type') === 'lay') ? 'lay' : 'back';
 
   // Calculate profit (% Aumentada boost multiplier applies on winning profit)
   const boostMult = (bet.boostActive && bet.boostPercent > 0) ? (1 + (bet.boostPercent / 100)) : 1;
+  const greenFactor = getGreenFactor(bet);
 
   // Calculate liability (Responsabilidade) for Lay bets
   const liability = (bet.exchangeType === 'lay' && bet.stake > 0 && bet.odd > 1) ? (bet.stake * (bet.odd - 1)) : 0;
@@ -317,13 +328,13 @@ function updateBetCalculations(dayId, betId, rowElement) {
   if (bet.exchangeType === 'lay') {
     if (bet.freebet) {
       if (bet.status === 'green') {
-        profit = bet.stake * boostMult;
+        profit = (bet.stake * greenFactor) * boostMult;
       } else {
         profit = 0; // red, refunded, pending are all 0 out-of-pocket profit/loss
       }
     } else {
       if (bet.status === 'green') {
-        profit = bet.stake * boostMult;
+        profit = (bet.stake * greenFactor) * boostMult;
       } else if (bet.status === 'red') {
         profit = -liability;
       } else if (bet.status === 'refunded' || bet.status === 'pending') {
@@ -334,13 +345,13 @@ function updateBetCalculations(dayId, betId, rowElement) {
     // Back bet
     if (bet.freebet) {
       if (bet.status === 'green') {
-        profit = ((bet.stake * bet.odd) - bet.stake) * boostMult;
+        profit = (((bet.stake * bet.odd) - bet.stake) * greenFactor) * boostMult;
       } else {
         profit = 0; // red, refunded, pending are all 0 out-of-pocket profit/loss
       }
     } else {
       if (bet.status === 'green') {
-        profit = ((bet.stake * bet.odd) - bet.stake) * boostMult;
+        profit = (((bet.stake * bet.odd) - bet.stake) * greenFactor) * boostMult;
       } else if (bet.status === 'red') {
         profit = -bet.stake;
       } else if (bet.status === 'refunded' || bet.status === 'pending') {
@@ -412,7 +423,7 @@ function updateBetVisuals(bet, rowElement) {
     if (isLay) {
       betReturn = bet.freebet ? bet.profit : (liability + bet.profit);
     } else {
-      betReturn = bet.freebet ? (((stake * odd) - stake) * boostMult) : (((stake * odd) - stake) * boostMult + stake);
+      betReturn = bet.freebet ? bet.profit : (stake + bet.profit);
     }
   } else if (bet.status === 'refunded' && !bet.freebet) {
     betReturn = isLay ? liability : stake;
@@ -484,6 +495,17 @@ function updateBetVisuals(bet, rowElement) {
   if (boostSpan) {
     boostSpan.className = `absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold ${bet.boostActive ? 'text-amber-400' : 'text-slate-600'} pointer-events-none`;
   }
+
+  const greenPercentInput = rowElement.querySelector('[data-field="greenPercent"]');
+  const greenPercentSpan = greenPercentInput ? greenPercentInput.parentNode.querySelector('span') : null;
+
+  if (greenPercentInput) {
+    const isGreen = bet.status === 'green';
+    greenPercentInput.disabled = !isGreen;
+    if (greenPercentSpan) {
+      greenPercentSpan.className = `absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold ${isGreen ? 'text-emerald-400' : 'text-slate-600'} pointer-events-none`;
+    }
+  }
 }
 
 // Recompute the totals for a specific day and update its UI header elements
@@ -521,9 +543,9 @@ function updateDaySummary(dayId, targetDayElement = null) {
         }
       } else {
         if (bet.freebet) {
-          totalReturn += ((stake * odd) - stake) * boostMult;
+          totalReturn += bet.profit;
         } else {
-          totalReturn += ((stake * odd) - stake) * boostMult + stake;
+          totalReturn += stake + bet.profit;
         }
       }
     } else if (bet.status === 'refunded' && !bet.freebet) {
@@ -588,7 +610,7 @@ function updateDateGroupHeader(dateKey) {
         if (isLay) {
           dateReturn += bet.freebet ? bet.profit : (liability + bet.profit);
         } else {
-          dateReturn += bet.freebet ? (((stake * odd) - stake) * boostMult) : (((stake * odd) - stake) * boostMult + stake);
+          dateReturn += bet.freebet ? bet.profit : (stake + bet.profit);
         }
       } else if (bet.status === 'refunded' && !bet.freebet) {
         dateReturn += riskAmount;
@@ -647,6 +669,7 @@ function updateGlobalStats() {
       netProfit += bet.profit || 0;
 
       if (bet.status === 'green') {
+        const gf = getGreenFactor(bet);
         if (isLay) {
           if (bet.freebet) {
             totalReturn += bet.profit; // Net winnings returned
@@ -655,13 +678,13 @@ function updateGlobalStats() {
           }
         } else {
           if (bet.freebet) {
-            totalReturn += (stake * odd) - stake; // Net winnings returned
+            totalReturn += bet.profit; // Net winnings returned
           } else {
-            totalReturn += stake * odd; // Full return (stake + net profit)
+            totalReturn += stake + bet.profit; // Full return (stake + net profit)
           }
         }
         resolvedBetsCount++;
-        wonBetsCount++;
+        wonBetsCount += (gf < 1 ? gf : 1);
       } else if (bet.status === 'red') {
         resolvedBetsCount++;
       } else if (bet.status === 'refunded') {
@@ -855,15 +878,16 @@ function createDayElement(day) {
     </div>
     
     <div class="day-content border-t border-slate-900/60 bg-slate-950/20 ${day.expanded ? '' : 'hidden'}">
-      <div class="hidden md:grid grid-cols-12 gap-3 items-center py-2.5 px-4 bg-slate-900/15 border-b border-slate-900/50 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+      <div class="hidden md:grid grid-cols-12 gap-2.5 items-center py-2.5 px-4 bg-slate-900/15 border-b border-slate-900/50 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
         <div class="col-span-2">Casa de Aposta</div>
         <div class="col-span-1 text-center">Tipo</div>
+        <div class="col-span-1 text-center">Freebet</div>
         <div class="col-span-2">Stake (Valor)</div>
         <div class="col-span-1">Odd</div>
-        <div class="col-span-1 text-center">Freebet</div>
-        <div class="col-span-2">% Aumentada</div>
+        <div class="col-span-1 text-center">% Aum.</div>
+        <div class="col-span-1 text-center">% Green</div>
         <div class="col-span-1">Status</div>
-        <div class="col-span-1 text-right">Resultado / Retorno</div>
+        <div class="col-span-1 text-right">Resultado</div>
         <div class="col-span-1"></div>
       </div>
       
@@ -926,17 +950,25 @@ function createBetRowElement(dayId, bet) {
     </div>
     
     <!-- % Aumentada -->
-    <div class="col-span-2 md:col-span-2 flex flex-col">
+    <div class="col-span-1 md:col-span-1 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">% Aumentada</label>
-      <div class="flex items-center gap-1.5">
-        <button type="button" data-field="boostActive" data-active="${bet.boostActive ? 'true' : 'false'}" class="btn-boost flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl border text-xs font-bold transition-all ${bet.boostActive ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-amber-400'}" title="Ativar % Aumentada">
+      <div class="flex items-center gap-1">
+        <button type="button" data-field="boostActive" data-active="${bet.boostActive ? 'true' : 'false'}" class="btn-boost flex items-center justify-center p-1.5 rounded-xl border text-xs font-bold transition-all ${bet.boostActive ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-amber-400'}" title="Ativar % Aumentada (Boost)">
           <i data-lucide="percent" class="w-3.5 h-3.5"></i>
-          <span class="inline text-xs">%</span>
         </button>
-        <div class="relative flex-1">
-          <input type="number" data-field="boostPercent" value="${bet.boostPercent || ''}" placeholder="0%" min="0" step="1" ${bet.boostActive ? '' : 'disabled'} class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-2.5 pr-6 py-1.5 text-xs md:text-sm text-slate-200 focus:border-amber-500 focus:bg-slate-950 shadow-inner disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold ${bet.boostActive ? 'text-amber-400' : 'text-slate-600'} pointer-events-none">%</span>
+        <div class="relative flex-1 min-w-0">
+          <input type="number" data-field="boostPercent" value="${bet.boostPercent || ''}" placeholder="0%" min="0" step="1" ${bet.boostActive ? '' : 'disabled'} class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-1.5 pr-4 py-1.5 text-xs text-slate-200 focus:border-amber-500 focus:bg-slate-950 shadow-inner disabled:opacity-40 disabled:cursor-not-allowed transition-all font-medium">
+          <span class="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-semibold ${bet.boostActive ? 'text-amber-400' : 'text-slate-600'} pointer-events-none">%</span>
         </div>
+      </div>
+    </div>
+
+    <!-- % Green (Cashout %) -->
+    <div class="col-span-1 md:col-span-1 flex flex-col">
+      <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">% Green</label>
+      <div class="relative flex items-center">
+        <input type="number" data-field="greenPercent" value="${bet.greenPercent !== undefined && bet.greenPercent !== null ? bet.greenPercent : ''}" placeholder="100%" min="0" max="1000" step="1" ${ bet.status === 'green' ? '' : 'disabled' } class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-2 pr-4 py-1.5 text-xs text-slate-200 focus:border-emerald-500 focus:bg-slate-950 shadow-inner disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-all" title="% Ganha do Green (Ex: 50% para meio green, 75%, 100%)">
+        <span class="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-semibold ${ bet.status === 'green' ? 'text-emerald-400' : 'text-slate-600' } pointer-events-none">%</span>
       </div>
     </div>
     
@@ -1086,7 +1118,7 @@ function renderAllDays(filterQuery = '') {
           if (isLay) {
             dateReturn += bet.freebet ? bet.profit : (liability + bet.profit);
           } else {
-            dateReturn += bet.freebet ? (((stake * odd) - stake) * boostMult) : (((stake * odd) - stake) * boostMult + stake);
+            dateReturn += bet.freebet ? bet.profit : (stake + bet.profit);
           }
         } else if (bet.status === 'refunded' && !bet.freebet) {
           dateReturn += riskAmount;
@@ -1256,6 +1288,7 @@ function addBetToDay(dayId) {
     odd: 0,
     boostActive: false,
     boostPercent: 0,
+    greenPercent: undefined,
     status: 'pending',
     freebet: false,
     profit: 0
@@ -1569,6 +1602,7 @@ function duplicateDay(dayId) {
       odd: bet.odd || 0,
       boostActive: !!bet.boostActive,
       boostPercent: bet.boostPercent || 0,
+      greenPercent: bet.greenPercent,
       status: bet.status || 'pending',
       freebet: !!bet.freebet,
       profit: bet.profit || 0
@@ -2203,7 +2237,7 @@ function renderBetsSummary() {
           if (isLay) {
             sessReturn += b.freebet ? (b.profit || (stakeVal * boostMult)) : (liability + (b.profit || (stakeVal * boostMult)));
           } else {
-            sessReturn += b.freebet ? ((stakeVal * oddVal) - stakeVal) * boostMult : ((stakeVal * oddVal) - stakeVal) * boostMult + stakeVal;
+            sessReturn += b.freebet ? (b.profit || (((stakeVal * oddVal) - stakeVal) * boostMult)) : (stakeVal + (b.profit || (((stakeVal * oddVal) - stakeVal) * boostMult)));
           }
         } else if (b.status === 'refunded' && !b.freebet) {
           sessReturn += riskVal;
@@ -2432,7 +2466,7 @@ function getBetsSummaryData() {
           if (isLay) {
             sessReturn += b.freebet ? (b.profit || (stakeVal * boostMult)) : (liability + (b.profit || (stakeVal * boostMult)));
           } else {
-            sessReturn += b.freebet ? ((stakeVal * oddVal) - stakeVal) * boostMult : ((stakeVal * oddVal) - stakeVal) * boostMult + stakeVal;
+            sessReturn += b.freebet ? (b.profit || (((stakeVal * oddVal) - stakeVal) * boostMult)) : (stakeVal + (b.profit || (((stakeVal * oddVal) - stakeVal) * boostMult)));
           }
         } else if (b.status === 'refunded' && !b.freebet) {
           sessReturn += riskVal;
