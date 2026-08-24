@@ -2809,6 +2809,7 @@ function renderCalcEntries() {
     const housePlaceholder = `Ex: Seleção / Casa ${index + 1}`;
     const oddPlaceholder = `Ex: 2.10`;
     const commPlaceholder = `0%`;
+    const stakeValueDisplay = entry.calculatedStake ? entry.calculatedStake.toFixed(2) : '';
 
     return `
       <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 items-center relative transition-all">
@@ -2823,8 +2824,8 @@ function renderCalcEntries() {
         </div>
 
         <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Calculada (R$)</label>
-          <input type="text" id="calc-stake-display-${index}" readonly value="${entry.calculatedStake ? 'R$ ' + entry.calculatedStake.toFixed(2).replace('.', ',') : 'R$ 0,00'}" class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:outline-none cursor-not-allowed">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Stake Aposta ${index + 1} (R$)</label>
+          <input type="number" step="0.01" min="0" id="calc-stake-display-${index}" data-entry-field="calculatedStake" data-entry-index="${index}" value="${stakeValueDisplay}" placeholder="Ex: 50.00" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:border-indigo-500 focus:outline-none">
         </div>
 
         <div class="sm:col-span-2">
@@ -2859,7 +2860,16 @@ function renderCalcEntries() {
     const idx = parseInt(input.getAttribute('data-entry-index'), 10);
     if (field && !isNaN(idx) && calcState.entries[idx]) {
       const handler = (e) => {
-        calcState.entries[idx][field] = e.target.value;
+        if (field === 'calculatedStake') {
+          calcState.entries[idx].manualStake = parseFloat(e.target.value) || 0;
+          calcState.entries[idx].isManual = true;
+          calcState.entries[idx].calculatedStake = parseFloat(e.target.value) || 0;
+        } else {
+          calcState.entries[idx][field] = e.target.value;
+          if (field === 'odd' || field === 'type') {
+            calcState.entries[idx].isManual = false;
+          }
+        }
         calculateBetTracker();
       };
       input.addEventListener('input', handler);
@@ -2905,6 +2915,7 @@ function initBetTrackerCalculator() {
     if (!item.btn) return;
     item.btn.addEventListener('click', () => {
       calcState.mode = item.mode;
+      calcState.entries.forEach(e => e.isManual = false);
       modeButtons.forEach(b => {
         if (!b.btn) return;
         if (b.mode === item.mode) {
@@ -2928,8 +2939,14 @@ function initBetTrackerCalculator() {
   // Input de Investimento Total
   const inputTotalInv = document.getElementById('calc-total-investment');
   if (inputTotalInv) {
-    inputTotalInv.addEventListener('input', calculateBetTracker);
-    inputTotalInv.addEventListener('change', calculateBetTracker);
+    inputTotalInv.addEventListener('input', () => {
+      calcState.entries.forEach(e => e.isManual = false);
+      calculateBetTracker();
+    });
+    inputTotalInv.addEventListener('change', () => {
+      calcState.entries.forEach(e => e.isManual = false);
+      calculateBetTracker();
+    });
   }
 
   // Arredondamento Select
@@ -2937,6 +2954,7 @@ function initBetTrackerCalculator() {
   if (selectRounding) {
     selectRounding.addEventListener('change', (e) => {
       calcState.rounding = e.target.value;
+      calcState.entries.forEach(e => e.isManual = false);
       calculateBetTracker();
     });
   }
@@ -2970,6 +2988,30 @@ function initBetTrackerCalculator() {
   const btnExportSheet = document.getElementById('calc-btn-export-sheet');
   if (btnExportSheet) {
     btnExportSheet.addEventListener('click', openExportCalcModal);
+  }
+
+  // Alternador do Modo de Exportação (Novo Dia vs Dia Existente)
+  const btnTargetNew = document.getElementById('calc-export-target-new');
+  const btnTargetExisting = document.getElementById('calc-export-target-existing');
+  const containerNew = document.getElementById('calc-export-container-new');
+  const containerExisting = document.getElementById('calc-export-container-existing');
+
+  if (btnTargetNew && btnTargetExisting) {
+    btnTargetNew.addEventListener('click', () => {
+      calcState.exportMode = 'new';
+      btnTargetNew.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
+      btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+      if (containerNew) containerNew.classList.remove('hidden');
+      if (containerExisting) containerExisting.classList.add('hidden');
+    });
+
+    btnTargetExisting.addEventListener('click', () => {
+      calcState.exportMode = 'existing';
+      btnTargetExisting.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
+      btnTargetNew.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+      if (containerExisting) containerExisting.classList.remove('hidden');
+      if (containerNew) containerNew.classList.add('hidden');
+    });
   }
 
   // Modal Export Listeners
@@ -3008,14 +3050,16 @@ function calculateBetTracker() {
   const resModeLabel = document.getElementById('calc-res-mode-label');
   const tbody = document.getElementById('calc-scenarios-tbody');
 
-  // Caso os dados estejam incompletos ou sem valor investido
+  // Caso os dados estejam incompletos ou sem valor investido (e sem stake manual)
   const hasValidOdds = parsedEntries.every(e => e.odd > 1.0);
 
-  if (totalInv <= 0 || !hasValidOdds) {
+  if (!hasValidOdds) {
     calcState.entries.forEach((e, idx) => {
-      e.calculatedStake = 0;
+      if (!e.isManual) e.calculatedStake = 0;
       const el = document.getElementById(`calc-stake-display-${idx}`);
-      if (el) el.value = 'R$ 0,00';
+      if (el && document.activeElement !== el) {
+        el.value = e.calculatedStake ? e.calculatedStake.toFixed(2) : '';
+      }
     });
 
     if (resProfit) {
@@ -3024,7 +3068,7 @@ function calculateBetTracker() {
     }
 
     if (resRoi) {
-      resRoi.innerHTML = `<i data-lucide="info" class="w-3.5 h-3.5"></i> Digite o valor total e as odds para calcular`;
+      resRoi.innerHTML = `<i data-lucide="info" class="w-3.5 h-3.5"></i> Digite as odds para calcular`;
       resRoi.className = "text-xs font-semibold text-slate-400 mt-1 flex items-center gap-1";
     }
 
@@ -3070,7 +3114,6 @@ function calculateBetTracker() {
     const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
     rawStakes = multipliers.map(m => totalInv / (m * P));
   } else if (calcState.mode === 'freebet') {
-    // Aposta 1 é a Freebet (Valor = totalInv)
     rawStakes[0] = totalInv;
     const targetNetWin1 = rawStakes[0] * multipliers[0];
     for (let i = 1; i < parsedEntries.length; i++) {
@@ -3078,7 +3121,6 @@ function calculateBetTracker() {
       rawStakes[i] = (m > 1) ? (targetNetWin1 / (m - 1)) : 0;
     }
   } else if (calcState.mode === 'riskfree') {
-    // Sem Risco na Aposta 1 (se Aposta 1 perder, as outras cobrem a Stake 1)
     rawStakes[0] = totalInv;
     for (let i = 1; i < parsedEntries.length; i++) {
       const m = multipliers[i];
@@ -3086,14 +3128,21 @@ function calculateBetTracker() {
     }
   }
 
-  // Aplicar Arredondamento
-  const finalStakes = rawStakes.map(s => Math.max(0, applyStakeRounding(s, calcState.rounding)));
+  // Aplicar Arredondamento ou manter override manual se digitado pelo usuário
+  const finalStakes = rawStakes.map((s, idx) => {
+    if (calcState.entries[idx]?.isManual && !isNaN(calcState.entries[idx]?.manualStake)) {
+      return calcState.entries[idx].manualStake;
+    }
+    return Math.max(0, applyStakeRounding(s, calcState.rounding));
+  });
 
-  // Atualizar calcState e displays de stake
+  // Atualizar calcState e displays de stake (sem sobresscrever input em foco do usuário)
   finalStakes.forEach((stake, idx) => {
     if (calcState.entries[idx]) calcState.entries[idx].calculatedStake = stake;
     const el = document.getElementById(`calc-stake-display-${idx}`);
-    if (el) el.value = 'R$ ' + stake.toFixed(2).replace('.', ',');
+    if (el && document.activeElement !== el) {
+      el.value = stake > 0 ? stake.toFixed(2) : '';
+    }
   });
 
   // Recalcular Investimento Real Total
@@ -3194,20 +3243,44 @@ function openExportCalcModal() {
   const modal = document.getElementById('modal-export-calc');
   const dateSelect = document.getElementById('modal-calc-export-date-select');
   const previewList = document.getElementById('modal-calc-preview-list');
-  if (!modal || !dateSelect || !previewList) return;
+  const inputDate = document.getElementById('input-calc-export-date');
+  const inputDayNotes = document.getElementById('input-calc-export-day-notes');
+  if (!modal || !previewList) return;
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const existingDays = (trackerData.days || []).map(d => d.date);
+  // Definir modo padrão como 'new' (Criar Novo Dia)
+  calcState.exportMode = 'new';
+  const btnTargetNew = document.getElementById('calc-export-target-new');
+  const btnTargetExisting = document.getElementById('calc-export-target-existing');
+  const containerNew = document.getElementById('calc-export-container-new');
+  const containerExisting = document.getElementById('calc-export-container-existing');
 
-  let optionsHtml = `<option value="${todayStr}">Hoje (${formatDateDisplay(todayStr)})</option>`;
-  existingDays.forEach(d => {
-    if (d !== todayStr) {
-      optionsHtml += `<option value="${d}">${formatDateDisplay(d)}</option>`;
-    }
-  });
-  dateSelect.innerHTML = optionsHtml;
+  if (btnTargetNew && btnTargetExisting) {
+    btnTargetNew.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
+    btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+    if (containerNew) containerNew.classList.remove('hidden');
+    if (containerExisting) containerExisting.classList.add('hidden');
+  }
 
-  // Gerar preview de todas as entradas ativas da calculadora
+  // Preencher data de hoje no formato local (YYYY-MM-DD)
+  const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+  const todayStr = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 10);
+
+  if (inputDate) inputDate.value = todayStr;
+  if (inputDayNotes) inputDayNotes.value = '';
+
+  // Preencher select de dias existentes
+  if (dateSelect) {
+    const existingDays = (trackerData.days || []).map(d => d.date);
+    let optionsHtml = `<option value="${todayStr}">Hoje (${formatDateDisplay(todayStr)})</option>`;
+    existingDays.forEach(d => {
+      if (d !== todayStr) {
+        optionsHtml += `<option value="${d}">${formatDateDisplay(d)}</option>`;
+      }
+    });
+    dateSelect.innerHTML = optionsHtml;
+  }
+
+  // Preview de todas as entradas ativas da calculadora
   let previewHtml = calcState.entries.map((e, idx) => {
     const houseName = e.house || `Seleção ${idx + 1}`;
     const oddVal = parseFloat(e.odd) || 1.00;
@@ -3215,15 +3288,16 @@ function openExportCalcModal() {
     const isFreebet = e.type !== 'real';
 
     return `
-      <div class="flex items-center justify-between py-1 border-b border-slate-800/80">
+      <div class="flex items-center justify-between py-1.5 border-b border-slate-800/80 text-xs">
         <span>${idx + 1}. <strong>${houseName}</strong> @ ${oddVal.toFixed(2)} (${isFreebet ? 'Freebet' : 'Saldo Real'})</span>
-        <span class="font-bold text-slate-100">R$ ${stakeVal.toFixed(2).replace('.', ',')}</span>
+        <span class="font-bold text-indigo-300">R$ ${stakeVal.toFixed(2).replace('.', ',')}</span>
       </div>
     `;
   }).join('');
 
   previewList.innerHTML = previewHtml;
   modal.classList.remove('hidden');
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function closeExportCalcModal() {
@@ -3232,40 +3306,63 @@ function closeExportCalcModal() {
 }
 
 async function confirmExportCalcToTracker() {
-  const dateSelect = document.getElementById('modal-calc-export-date-select');
   const statusSelect = document.getElementById('modal-calc-export-status');
-  if (!dateSelect || !statusSelect) return;
+  if (!statusSelect) return;
 
-  const targetDate = dateSelect.value;
-  const initialStatus = statusSelect.value; // 'pending' | 'green'
+  const initialStatus = statusSelect.value || 'pending'; // 'pending' | 'green'
+
+  const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+  const todayStr = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 10);
+
+  let targetDate = todayStr;
+  let dayNotes = '';
+
+  if (calcState.exportMode === 'existing') {
+    const dateSelect = document.getElementById('modal-calc-export-date-select');
+    targetDate = dateSelect ? dateSelect.value : todayStr;
+  } else {
+    const inputDate = document.getElementById('input-calc-export-date');
+    const inputNotes = document.getElementById('input-calc-export-day-notes');
+    targetDate = (inputDate && inputDate.value) ? inputDate.value : todayStr;
+    dayNotes = (inputNotes && inputNotes.value) ? inputNotes.value : 'Entradas da Calculadora';
+  }
 
   let targetDay = trackerData.days.find(d => d.date === targetDate);
   if (!targetDay) {
     targetDay = {
+      id: 'day-' + Date.now(),
       date: targetDate,
-      initialBalance: globalBalance || 0,
+      notes: dayNotes || 'Apostas da Calculadora',
+      expanded: true,
+      active: true,
       bets: []
     };
     trackerData.days.push(targetDay);
+  } else {
+    if (dayNotes) targetDay.notes = dayNotes;
+    targetDay.expanded = true;
   }
 
   if (!targetDay.bets) targetDay.bets = [];
 
+  const now = Date.now();
   const newBets = calcState.entries.map((e, idx) => {
     const houseName = e.house || `Seleção ${idx + 1}`;
     const oddVal = parseFloat(e.odd) || 1.01;
     const stakeVal = e.calculatedStake || 0;
     const isFreebet = e.type !== 'real';
+    const freebetType = e.type === 'freebet_snr' ? 'snr' : (e.type === 'freebet_sr' ? 'sr' : 'none');
 
     return {
-      id: Date.now() + '-' + (idx + 1),
-      house: houseName,
-      betType: calcState.mode === 'surebet' ? 'Surebet' : (calcState.mode === 'freebet' ? 'Freebet' : 'Dutching'),
-      odd: oddVal,
+      id: 'bet-' + now + '-' + idx + '-' + Math.floor(Math.random() * 1000),
+      bookmaker: houseName,
+      exchangeType: 'back',
       stake: stakeVal,
-      status: initialStatus,
+      odd: oddVal,
+      boostActive: isFreebet,
+      boostType: freebetType,
       freebet: isFreebet,
-      return: initialStatus === 'green' ? (stakeVal * oddVal) : 0,
+      status: initialStatus,
       profit: initialStatus === 'green' ? (stakeVal * (oddVal - 1)) : 0
     };
   });
@@ -3277,8 +3374,16 @@ async function confirmExportCalcToTracker() {
   renderAllDays();
   updateGlobalCapital();
 
-  // Ir para a aba Dashboard para ver as entradas inseridas
+  // Ir para a aba Dashboard para ver as entradas inseridas no tracker
   activateDashboardTab();
+
+  // Rolar suavemente até o dia cadastrado
+  setTimeout(() => {
+    const dayEl = document.querySelector(`[data-day-id="${targetDay.id}"]`);
+    if (dayEl) {
+      dayEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 150);
 }
 
 // ==========================================
