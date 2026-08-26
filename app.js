@@ -3430,14 +3430,16 @@ function openExportCalcModal() {
 
   // Preencher select de dias existentes
   if (dateSelect) {
-    const existingDays = (trackerData.days || []).map(d => d.date);
-    let optionsHtml = `<option value="${todayStr}">Hoje (${formatDate(todayStr)})</option>`;
-    existingDays.forEach(d => {
-      if (d !== todayStr) {
-        optionsHtml += `<option value="${d}">${formatDate(d)}</option>`;
-      }
-    });
-    dateSelect.innerHTML = optionsHtml;
+    if (!trackerData.days || trackerData.days.length === 0) {
+      dateSelect.innerHTML = `<option value="">Nenhum dia cadastrado</option>`;
+    } else {
+      let optionsHtml = trackerData.days.map(d => {
+        const notesText = d.notes ? ` (${d.notes})` : '';
+        const dateText = formatDate(d.date);
+        return `<option value="${d.id}">${dateText}${notesText}</option>`;
+      }).join('');
+      dateSelect.innerHTML = optionsHtml;
+    }
   }
 
   // Preview de todas as entradas ativas da calculadora
@@ -3476,10 +3478,17 @@ async function confirmExportCalcToTracker() {
 
   let targetDate = todayStr;
   let dayNotes = '';
+  let targetDay = null;
 
   if (calcState.exportMode === 'existing') {
     const dateSelect = document.getElementById('modal-calc-export-date-select');
-    targetDate = dateSelect ? dateSelect.value : todayStr;
+    const selectedDayId = dateSelect ? dateSelect.value : null;
+    if (selectedDayId) {
+      targetDay = trackerData.days.find(d => d.id === selectedDayId || d.date === selectedDayId);
+      if (targetDay) {
+        targetDate = targetDay.date;
+      }
+    }
   } else {
     const inputDate = document.getElementById('input-calc-export-date');
     const inputNotes = document.getElementById('input-calc-export-day-notes');
@@ -3487,7 +3496,6 @@ async function confirmExportCalcToTracker() {
     dayNotes = (inputNotes && inputNotes.value) ? inputNotes.value : 'Entradas da Calculadora';
   }
 
-  let targetDay = trackerData.days.find(d => d.date === targetDate);
   if (!targetDay) {
     targetDay = {
       id: 'day-' + Date.now(),
