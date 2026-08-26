@@ -62,7 +62,7 @@ function saveLocalFallback() {
   } catch (e) {}
 }
 
-/// Load data directly from Supabase DB table app_state filtered by user_id
+// Load data directly from Supabase DB table app_state using user.id
 async function loadData() {
   showSyncIndicator('loading', 'Conectando Supabase...');
 
@@ -74,7 +74,7 @@ async function loadData() {
   }
 
   try {
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    const { data: userData } = await supabaseClient.auth.getUser();
     const user = userData?.user;
 
     if (!user) {
@@ -84,21 +84,20 @@ async function loadData() {
       return;
     }
 
-    // Busca por user_id ou id correspondente ao user.id
+    // Busca o registro na tabela app_state associado ao user_id / UUID do usuário
     let { data, error } = await supabaseClient
       .from('app_state')
       .select('*')
       .eq('user_id', user.id);
 
     if (error || !data || data.length === 0) {
-      // Tentar busca fallback por id = user.id
-      const fallbackResult = await supabaseClient
+      const fallbackById = await supabaseClient
         .from('app_state')
         .select('*')
         .eq('id', user.id);
 
-      if (!fallbackResult.error && fallbackResult.data && fallbackResult.data.length > 0) {
-        data = fallbackResult.data;
+      if (!fallbackById.error && fallbackById.data && fallbackById.data.length > 0) {
+        data = fallbackById.data;
         error = null;
       }
     }
@@ -113,7 +112,6 @@ async function loadData() {
     if (data && data.length > 0) {
       const row = data[0];
 
-      // Parse tracker_data
       if (row.tracker_data) {
         trackerData = typeof row.tracker_data === 'string' ? JSON.parse(row.tracker_data) : row.tracker_data;
       } else {
@@ -122,12 +120,10 @@ async function loadData() {
       if (!trackerData.days) trackerData.days = [];
       if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
 
-      // Parse global_balance
       if (row.global_balance !== undefined && row.global_balance !== null) {
         globalBalance = parseFloat(row.global_balance) || 0;
       }
 
-      // Parse balance_history
       if (row.balance_history) {
         balanceHistory = typeof row.balance_history === 'string' ? JSON.parse(row.balance_history) : row.balance_history;
       }
@@ -136,7 +132,7 @@ async function loadData() {
       saveLocalFallback();
       showSyncIndicator('synced', 'Supabase Conectado');
     } else {
-      console.log(`Tabela app_state vazia para o usuário ${user.id}. Criando novo registro...`);
+      console.log(`Nenhum registro encontrado em app_state para user_id=${user.id}. Criando novo estado...`);
       trackerData = { days: [], dailyNotes: [] };
       globalBalance = 0;
       balanceHistory = [];
@@ -150,7 +146,7 @@ async function loadData() {
   }
 }
 
-// Immediate save to Supabase
+// Immediate save to Supabase using user.id as record identifier
 async function saveDataImmediate() {
   saveLocalFallback();
 
@@ -159,15 +155,16 @@ async function saveDataImmediate() {
   showSyncIndicator('saving', 'Salvando...');
 
   try {
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    const { data: userData } = await supabaseClient.auth.getUser();
     const user = userData?.user;
 
     if (!user) {
-      console.warn('Não foi possível salvar no Supabase: Usuário não autenticado.');
+      console.warn('Não foi possível salvar: Usuário não autenticado.');
       showSyncIndicator('error', 'Não autenticado');
       return;
     }
 
+    // Vincula o identificador do registro (id e user_id) diretamente ao UUID do usuário logado
     const record = {
       id: user.id,
       user_id: user.id,
@@ -177,17 +174,15 @@ async function saveDataImmediate() {
       updated_at: new Date().toISOString()
     };
 
-    // Tentar upsert padrão com fallback de onConflict
     let { error } = await supabaseClient
       .from('app_state')
       .upsert(record);
 
     if (error) {
-      console.warn('Upsert padrão falhou, tentando upsert com onConflict user_id:', error.message);
-      const tryUserConflict = await supabaseClient
+      const retryWithConflict = await supabaseClient
         .from('app_state')
         .upsert(record, { onConflict: 'user_id' });
-      error = tryUserConflict.error;
+      error = retryWithConflict.error;
     }
 
     if (error) {
