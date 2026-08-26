@@ -62,7 +62,7 @@ function saveLocalFallback() {
   } catch (e) {}
 }
 
-// Load data directly from Supabase DB table app_state (Row id = "1")
+/// Load data directly from Supabase DB table app_state filtered by user_id
 async function loadData() {
   showSyncIndicator('loading', 'Conectando Supabase...');
 
@@ -74,10 +74,34 @@ async function loadData() {
   }
 
   try {
-    const { data, error } = await supabaseClient
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) {
+      console.warn('Nenhum usuário logado no Supabase. Usando cache local.');
+      loadLocalFallback();
+      showSyncIndicator('error', 'Não autenticado');
+      return;
+    }
+
+    // Busca por user_id ou id correspondente ao user.id
+    let { data, error } = await supabaseClient
       .from('app_state')
       .select('*')
-      .eq('id', '1');
+      .eq('user_id', user.id);
+
+    if (error || !data || data.length === 0) {
+      // Tentar busca fallback por id = user.id
+      const fallbackResult = await supabaseClient
+        .from('app_state')
+        .select('*')
+        .eq('id', user.id);
+
+      if (!fallbackResult.error && fallbackResult.data && fallbackResult.data.length > 0) {
+        data = fallbackResult.data;
+        error = null;
+      }
+    }
 
     if (error) {
       console.error('Erro ao ler tabela app_state no Supabase:', error);
@@ -112,8 +136,11 @@ async function loadData() {
       saveLocalFallback();
       showSyncIndicator('synced', 'Supabase Conectado');
     } else {
-      console.log('Tabela app_state vazia para id=1. Gravando dados no Supabase...');
-      loadLocalFallback();
+      console.log(`Tabela app_state vazia para o usuário ${user.id}. Criando novo registro...`);
+      trackerData = { days: [], dailyNotes: [] };
+      globalBalance = 0;
+      balanceHistory = [];
+      saveLocalFallback();
       await saveDataImmediate();
     }
   } catch (err) {
@@ -132,17 +159,36 @@ async function saveDataImmediate() {
   showSyncIndicator('saving', 'Salvando...');
 
   try {
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) {
+      console.warn('Não foi possível salvar no Supabase: Usuário não autenticado.');
+      showSyncIndicator('error', 'Não autenticado');
+      return;
+    }
+
     const record = {
-      id: "1",
+      id: user.id,
+      user_id: user.id,
       tracker_data: trackerData,
       global_balance: globalBalance,
       balance_history: balanceHistory,
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabaseClient
+    // Tentar upsert padrão com fallback de onConflict
+    let { error } = await supabaseClient
       .from('app_state')
-      .upsert(record, { onConflict: 'id' });
+      .upsert(record);
+
+    if (error) {
+      console.warn('Upsert padrão falhou, tentando upsert com onConflict user_id:', error.message);
+      const tryUserConflict = await supabaseClient
+        .from('app_state')
+        .upsert(record, { onConflict: 'user_id' });
+      error = tryUserConflict.error;
+    }
 
     if (error) {
       console.error('Erro ao salvar no Supabase:', error);
@@ -194,12 +240,21 @@ function initRealtimeSync() {
   }
 }
 
-function handleRealtimeUpdate(payload) {
+async function handleRealtimeUpdate(payload) {
   const newRow = payload.new;
   if (!newRow) return;
 
-  // Only update if it pertains to row id "1"
-  if (newRow.id && String(newRow.id) !== "1") return;
+  // Filtrar atualizações em tempo real pelo user.id do usuário atual
+  let currentUser = null;
+  if (supabaseClient) {
+    const { data: userData } = await supabaseClient.auth.getUser();
+    currentUser = userData?.user;
+  }
+  if (!currentUser) return;
+
+  const isUserRow = (newRow.user_id && newRow.user_id === currentUser.id) ||
+                    (newRow.id && String(newRow.id) === String(currentUser.id));
+  if (!isUserRow) return;
 
   let updated = false;
 
@@ -4339,19 +4394,321 @@ function toggleMobileMenu() {
 }
 
 // ==========================================
+// SUPABASE AUTHENTICATION MODULE (LOGIN & REGISTRO)
+// ==========================================
+
+let currentSession = null;
+let currentAuthMode = 'login'; // 'login' ou 'register'
+
+function switchAuthMode(mode) {
+  currentAuthMode = mode;
+
+  const tabLogin = document.getElementById('auth-tab-login');
+  const tabRegister = document.getElementById('auth-tab-register');
+  const btnText = document.getElementById('auth-btn-text');
+  const togglePrompt = document.getElementById('auth-toggle-prompt');
+  const btnToggleMode = document.getElementById('btn-auth-toggle-mode');
+  const passwordHint = document.getElementById('auth-password-hint');
+
+  hideAuthAlert();
+
+  if (mode === 'login') {
+    if (tabLogin) {
+      tabLogin.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-indigo-600 text-white shadow-md';
+    }
+    if (tabRegister) {
+      tabRegister.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200';
+    }
+    if (btnText) btnText.textContent = 'Entrar na Conta';
+    if (togglePrompt) togglePrompt.textContent = 'Não tem uma conta?';
+    if (btnToggleMode) btnToggleMode.textContent = 'Criar Conta';
+    if (passwordHint) passwordHint.classList.add('hidden');
+  } else {
+    if (tabRegister) {
+      tabRegister.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-indigo-600 text-white shadow-md';
+    }
+    if (tabLogin) {
+      tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200';
+    }
+    if (btnText) btnText.textContent = 'Criar Nova Conta';
+    if (togglePrompt) togglePrompt.textContent = 'Já possui uma conta?';
+    if (btnToggleMode) btnToggleMode.textContent = 'Fazer Login';
+    if (passwordHint) passwordHint.classList.remove('hidden');
+  }
+}
+
+function showAuthAlert(message, type = 'error') {
+  const alertContainer = document.getElementById('auth-alert');
+  const alertIcon = document.getElementById('auth-alert-icon');
+  const alertMsg = document.getElementById('auth-alert-msg');
+  if (!alertContainer || !alertMsg) return;
+
+  alertContainer.classList.remove('hidden');
+  alertMsg.textContent = message;
+
+  if (type === 'error') {
+    alertContainer.className = 'mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-rose-950/50 border-rose-500/30 text-rose-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'alert-circle');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-rose-400';
+    }
+  } else if (type === 'success') {
+    alertContainer.className = 'mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-emerald-950/50 border-emerald-500/30 text-emerald-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'check-circle-2');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-emerald-400';
+    }
+  } else {
+    alertContainer.className = 'mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-indigo-950/50 border-indigo-500/30 text-indigo-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'info');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-indigo-400';
+    }
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons({ root: alertContainer });
+  }
+}
+
+function hideAuthAlert() {
+  const alertContainer = document.getElementById('auth-alert');
+  if (alertContainer) alertContainer.classList.add('hidden');
+}
+
+function setAuthLoading(isLoading) {
+  const btnSubmit = document.getElementById('btn-auth-submit');
+  const spinner = document.getElementById('auth-btn-spinner');
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+
+  if (btnSubmit) btnSubmit.disabled = isLoading;
+  if (emailInput) emailInput.disabled = isLoading;
+  if (passwordInput) passwordInput.disabled = isLoading;
+
+  if (spinner) {
+    if (isLoading) {
+      spinner.classList.remove('hidden');
+    } else {
+      spinner.classList.add('hidden');
+    }
+  }
+}
+
+function translateAuthError(error) {
+  if (!error) return 'Ocorreu um erro inesperado.';
+  const msg = error.message || error.toString();
+
+  if (msg.includes('Invalid login credentials')) {
+    return 'E-mail ou senha incorretos. Verifique seus dados e tente novamente.';
+  }
+  if (msg.includes('Email not confirmed')) {
+    return 'E-mail ainda não confirmado. Verifique a caixa de entrada do seu e-mail.';
+  }
+  if (msg.includes('User already registered') || msg.includes('user_already_exists')) {
+    return 'Este e-mail já está cadastrado. Alterne para a aba "Entrar" e faça login.';
+  }
+  if (msg.includes('Password should be at least 6 characters')) {
+    return 'A senha precisa ter no mínimo 6 caracteres.';
+  }
+  if (msg.includes('Unable to validate email address') || msg.includes('invalid format') || msg.includes('invalid email')) {
+    return 'Por favor, insira um endereço de e-mail válido.';
+  }
+  if (msg.includes('Signup requires a valid password')) {
+    return 'A senha informada é inválida.';
+  }
+
+  return msg;
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  if (!supabaseClient) {
+    showAuthAlert('SDK do Supabase não foi inicializado corretamente.', 'error');
+    return;
+  }
+
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+
+  if (!email || !password) {
+    showAuthAlert('Preencha todos os campos obrigatórios.', 'error');
+    return;
+  }
+
+  if (password.length < 6) {
+    showAuthAlert('A senha deve conter no mínimo 6 caracteres.', 'error');
+    return;
+  }
+
+  setAuthLoading(true);
+  hideAuthAlert();
+
+  try {
+    if (currentAuthMode === 'login') {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        showAuthAlert(translateAuthError(error), 'error');
+      } else if (data && data.session) {
+        showAuthAlert('Login realizado com sucesso! Redirecionando...', 'success');
+      }
+    } else {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password
+      });
+
+      if (error) {
+        showAuthAlert(translateAuthError(error), 'error');
+      } else {
+        if (data && data.session) {
+          showAuthAlert('Conta criada e logada com sucesso! Bem-vindo.', 'success');
+        } else if (data && data.user) {
+          showAuthAlert('Conta criada com sucesso! Se necessário, confirme seu e-mail antes de fazer login.', 'info');
+          switchAuthMode('login');
+          if (emailInput) emailInput.value = email;
+          if (passwordInput) passwordInput.value = '';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro de autenticação:', err);
+    showAuthAlert('Ocorreu uma falha de conexão. Tente novamente.', 'error');
+  } finally {
+    setAuthLoading(false);
+  }
+}
+
+async function handleLogout() {
+  if (supabaseClient) {
+    try {
+      showSyncIndicator('loading', 'Saindo...');
+      await supabaseClient.auth.signOut();
+    } catch (e) {
+      console.error('Erro ao fazer logout:', e);
+    }
+  }
+  trackerData = { days: [], dailyNotes: [] };
+  globalBalance = 0;
+  balanceHistory = [];
+  updateAppForSession(null);
+}
+
+let appLoaded = false;
+async function updateAppForSession(session) {
+  currentSession = session;
+  const authContainer = document.getElementById('auth-container');
+  const appContainer = document.getElementById('app-container');
+  const userBadge = document.getElementById('user-badge');
+  const userEmailDisplay = document.getElementById('user-email-display');
+
+  if (session && session.user) {
+    // Exibe a aplicação e esconde o login
+    if (authContainer) authContainer.classList.add('hidden');
+    if (appContainer) appContainer.classList.remove('hidden');
+
+    if (userEmailDisplay) userEmailDisplay.textContent = session.user.email || 'Usuário';
+    if (userBadge) userBadge.classList.remove('hidden');
+
+    if (window.lucide) window.lucide.createIcons();
+
+    // Carrega os dados se ainda não tiver carregado nesta sessão
+    if (!appLoaded) {
+      appLoaded = true;
+      await loadData();
+      initRealtimeSync();
+      renderAllDays();
+      updateGlobalCapital();
+      setDefaultNoteDate();
+      initBetTrackerCalculator();
+      handleHashNavigation();
+    }
+  } else {
+    // Esconde a aplicação e mostra a tela de login
+    appLoaded = false;
+    if (appContainer) appContainer.classList.add('hidden');
+    if (authContainer) authContainer.classList.remove('hidden');
+    if (userBadge) userBadge.classList.add('hidden');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
+async function initAuthFlow() {
+  const authForm = document.getElementById('auth-form');
+  const tabLogin = document.getElementById('auth-tab-login');
+  const tabRegister = document.getElementById('auth-tab-register');
+  const btnToggleMode = document.getElementById('btn-auth-toggle-mode');
+  const btnTogglePassword = document.getElementById('btn-toggle-password');
+  const btnLogout = document.getElementById('btn-logout');
+
+  if (tabLogin) tabLogin.addEventListener('click', () => switchAuthMode('login'));
+  if (tabRegister) tabRegister.addEventListener('click', () => switchAuthMode('register'));
+  if (btnToggleMode) {
+    btnToggleMode.addEventListener('click', () => {
+      switchAuthMode(currentAuthMode === 'login' ? 'register' : 'login');
+    });
+  }
+
+  if (btnTogglePassword) {
+    btnTogglePassword.addEventListener('click', () => {
+      const passwordInput = document.getElementById('auth-password');
+      if (!passwordInput) return;
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      btnTogglePassword.innerHTML = `<i data-lucide="${isPassword ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
+      if (window.lucide) window.lucide.createIcons({ root: btnTogglePassword });
+    });
+  }
+
+  if (authForm) {
+    authForm.addEventListener('submit', handleAuthSubmit);
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener('click', handleLogout);
+  }
+
+  // Verificar sessão atual
+  if (!supabaseClient) {
+    console.warn('Supabase não disponível.');
+    updateAppForSession(null);
+    return;
+  }
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    await updateAppForSession(session);
+
+    // Escutar eventos de sessão (SIGN_IN, SIGN_OUT, TOKEN_REFRESHED)
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      console.log('Evento Supabase Auth:', event);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await updateAppForSession(session);
+      } else if (event === 'SIGNED_OUT') {
+        await updateAppForSession(null);
+      }
+    });
+  } catch (err) {
+    console.error('Erro ao verificar sessão Supabase:', err);
+    updateAppForSession(null);
+  }
+}
+
+// ==========================================
 // APP START
 // ==========================================
 
 window.addEventListener('DOMContentLoaded', async () => {
-  await loadData();
-  initRealtimeSync();
-  renderAllDays();
-  updateGlobalCapital();
-  setDefaultNoteDate();
-
-  // Inicializar Calculadora Bet Tracker & Roteamento de Hash URL
-  initBetTrackerCalculator();
-  handleHashNavigation();
+  // Inicializa o fluxo de autenticação e sessão
+  await initAuthFlow();
 
   // Menu Mobile Listener
   const btnMobileMenuToggle = document.getElementById('btn-mobile-menu-toggle');
