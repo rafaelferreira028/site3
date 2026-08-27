@@ -2979,12 +2979,46 @@ function renderCalcEntries() {
       e.preventDefault();
       const idx = parseInt(btn.getAttribute('data-lock-entry-index'), 10);
       if (!isNaN(idx) && calcState.entries[idx]) {
-        calcState.entries[idx].isLocked = !calcState.entries[idx].isLocked;
-        if (calcState.entries[idx].isLocked) {
-          const currentVal = parseFloat(calcState.entries[idx].calculatedStake);
-          calcState.entries[idx].lockedStake = (!isNaN(currentVal) && currentVal > 0) ? currentVal : 100;
-          calcState.entries[idx].calculatedStake = calcState.entries[idx].lockedStake;
+        const targetEntry = calcState.entries[idx];
+        const isAlreadyLocked = !!targetEntry.isLocked;
+        const hasManualOverrides = calcState.entries.some(entry => entry.isManual);
+
+        if (isAlreadyLocked) {
+          if (hasManualOverrides) {
+            // Se já estava trancada e houveram edições manuais/acidentais em outras apostas,
+            // mantém a entrada trancada e limpa os overrides manuais para recalcular todas as apostas!
+            calcState.entries.forEach(entry => {
+              entry.isManual = false;
+              entry.manualStake = undefined;
+            });
+          } else {
+            // Se já estava trancada sem edições manuais pendentes, o clique destranca a entrada (toggle off)
+            targetEntry.isLocked = false;
+            calcState.entries.forEach(entry => {
+              entry.isManual = false;
+              entry.manualStake = undefined;
+            });
+          }
+        } else {
+          // Destranca todas as outras seleções para manter apenas a selecionada trancada
+          calcState.entries.forEach((entry, i) => {
+            if (i !== idx) {
+              entry.isLocked = false;
+            }
+            entry.isManual = false;
+            entry.manualStake = undefined;
+          });
+
+          targetEntry.isLocked = true;
+
+          // Se a entrada foi editada manualmente ou não tem lockedStake válido, usa o valor atual ou 100
+          const currentVal = parseFloat(targetEntry.calculatedStake);
+          if (targetEntry.isManual || !targetEntry.lockedStake || targetEntry.lockedStake <= 0 || isNaN(targetEntry.lockedStake)) {
+            targetEntry.lockedStake = (!isNaN(currentVal) && currentVal > 0) ? currentVal : 100;
+          }
+          targetEntry.calculatedStake = targetEntry.lockedStake;
         }
+
         renderCalcEntries();
         calculateBetTracker();
       }
@@ -3056,19 +3090,21 @@ function initBetTrackerCalculator() {
   // Input de Investimento Total
   const inputTotalInv = document.getElementById('calc-total-investment');
   if (inputTotalInv) {
-    inputTotalInv.addEventListener('input', () => {
-      // Se o usuário mexer no Investimento Total, destranca seleções ou recalcula a partir do novo total
-      if (!calcState.entries.some(e => e.isLocked)) {
+    const handleTotalInvChange = () => {
+      if (document.activeElement === inputTotalInv) {
+        calcState.entries.forEach(e => {
+          e.isLocked = false;
+          e.isManual = false;
+          e.manualStake = undefined;
+        });
+        renderCalcEntries();
+      } else if (!calcState.entries.some(e => e.isLocked)) {
         calcState.entries.forEach(e => e.isManual = false);
       }
       calculateBetTracker();
-    });
-    inputTotalInv.addEventListener('change', () => {
-      if (!calcState.entries.some(e => e.isLocked)) {
-        calcState.entries.forEach(e => e.isManual = false);
-      }
-      calculateBetTracker();
-    });
+    };
+    inputTotalInv.addEventListener('input', handleTotalInvChange);
+    inputTotalInv.addEventListener('change', handleTotalInvChange);
   }
 
   // Arredondamento Select
