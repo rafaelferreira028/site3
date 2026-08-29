@@ -442,6 +442,7 @@
               <tr class="border-b border-slate-900 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
                 <th class="pb-3 pl-2">Data e Hora</th>
                 <th class="pb-3">Tipo</th>
+                <th class="pb-3">Descrição / Operação</th>
                 <th class="pb-3 text-right">Valor</th>
                 <th class="pb-3 text-right pr-2">Ações</th>
               </tr>
@@ -1184,41 +1185,102 @@
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" role="dialog"
     aria-modal="true" aria-labelledby="modal-add-balance-title">
     <div
-      class="glass-panel w-full max-w-sm rounded-2xl border border-slate-800 shadow-2xl p-6 overflow-hidden animate-slide-down">
+      class="glass-panel w-full max-w-md rounded-2xl border border-slate-800 shadow-2xl p-6 overflow-hidden animate-slide-down">
       <div class="flex items-center justify-between pb-4 border-b border-slate-900">
         <h4 id="modal-add-balance-title" class="text-base font-bold text-slate-100 flex items-center gap-2">
           <i data-lucide="dollar-sign" class="w-5 h-5 text-indigo-400"></i>
-          Adicionar Saldo
+          Lançar no Saldo da Banca
         </h4>
-        <button id="modal-add-balance-close"
+        <button id="modal-add-balance-close" type="button"
           class="text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
+      <!-- Seletor de Modo de Lançamento -->
+      <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 mt-4">
+        <button type="button" id="btn-balance-mode-direct"
+          class="flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition-colors flex items-center justify-center gap-1.5">
+          <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+          Valor Direto
+        </button>
+        <button type="button" id="btn-balance-mode-calc"
+          class="flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center gap-1.5">
+          <i data-lucide="calculator" class="w-3.5 h-3.5 text-indigo-400"></i>
+          Apostado vs Retornou
+        </button>
+      </div>
+
       <form id="form-add-balance" class="mt-4 space-y-4">
-        <div>
+        
+        <!-- MODO 1: VALOR DIRETO -->
+        <div id="section-balance-direct" class="space-y-3">
           <label for="input-add-balance-val"
             class="block text-xs font-semibold text-slate-450 tracking-wider uppercase mb-1.5">Valor (R$)</label>
           <div class="relative">
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-semibold">R$</span>
-            <input type="number" id="input-add-balance-val" step="0.01" placeholder="0,00" required
+            <input type="number" id="input-add-balance-val" step="0.01" placeholder="0,00"
               class="w-full bg-slate-900/80 border border-slate-850 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:bg-slate-900 font-bold">
           </div>
-          <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
-            Digite um número positivo para somar saldo (ex: <span class="text-emerald-500 font-medium">39</span>) ou
-            negativo para retirar saldo (ex: <span class="text-rose-500 font-medium">-23</span>).
+          <p class="text-[10px] text-slate-500 leading-relaxed">
+            Digite um valor positivo para somar (ex: <span class="text-emerald-500 font-medium">50</span>) ou
+            negativo para retirar saldo (ex: <span class="text-rose-500 font-medium">-25</span>).
           </p>
         </div>
 
-        <div class="flex items-center gap-3 pt-4 border-t border-slate-900 mt-6">
+        <!-- MODO 2: CÁLCULO POR APOSTA/OPERAÇÃO -->
+        <div id="section-balance-calc" class="hidden space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="input-calc-wagered"
+                class="block text-xs font-semibold text-slate-400 tracking-wider uppercase mb-1">
+                Valor Apostado <span class="text-rose-400">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">R$</span>
+                <input type="number" id="input-calc-wagered" step="0.01" placeholder="500,00"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 font-bold focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div>
+              <label for="input-calc-returned"
+                class="block text-xs font-semibold text-slate-400 tracking-wider uppercase mb-1">
+                Valor Retornado <span class="text-emerald-400">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">R$</span>
+                <input type="number" id="input-calc-returned" step="0.01" placeholder="486,00"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 font-bold focus:border-indigo-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview em tempo real do Resultado Líquido -->
+          <div id="calc-preview-card" class="p-3 bg-slate-900/90 border border-slate-800 rounded-xl text-center">
+            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Resultado da Operação</span>
+            <span id="calc-preview-val" class="text-base font-bold text-slate-300">R$ 0,00</span>
+            <p id="calc-preview-sub" class="text-[10px] text-slate-500 mt-0.5">Informe quanto apostou e quanto voltou.</p>
+          </div>
+        </div>
+
+        <!-- Descrição / Observação Opcional -->
+        <div>
+          <label for="input-add-balance-desc" class="block text-xs font-semibold text-slate-450 tracking-wider uppercase mb-1">
+            Observação / Detalhes (Opcional)
+          </label>
+          <input type="text" id="input-add-balance-desc" placeholder="Ex: Aposta dia 28/08..."
+            class="w-full bg-slate-900/80 border border-slate-850 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-indigo-500">
+        </div>
+
+        <div class="flex items-center gap-3 pt-3 border-t border-slate-900 mt-5">
           <button type="button" id="btn-cancel-add-balance"
             class="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors">
             Cancelar
           </button>
           <button type="submit"
             class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/20 transition-colors">
-            Confirmar
+            Confirmar Lançamento
           </button>
         </div>
       </form>

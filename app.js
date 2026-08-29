@@ -1995,14 +1995,86 @@ const btnAddBalanceModal = document.getElementById('btn-add-balance-modal');
 const modalAddBalanceClose = document.getElementById('modal-add-balance-close');
 const btnCancelAddBalance = document.getElementById('btn-cancel-add-balance');
 const formAddBalance = document.getElementById('form-add-balance');
+
+const btnBalanceModeDirect = document.getElementById('btn-balance-mode-direct');
+const btnBalanceModeCalc = document.getElementById('btn-balance-mode-calc');
+const sectionBalanceDirect = document.getElementById('section-balance-direct');
+const sectionBalanceCalc = document.getElementById('section-balance-calc');
+
 const inputAddBalanceVal = document.getElementById('input-add-balance-val');
+const inputCalcWagered = document.getElementById('input-calc-wagered');
+const inputCalcReturned = document.getElementById('input-calc-returned');
+const inputAddBalanceDesc = document.getElementById('input-add-balance-desc');
+
+const calcPreviewVal = document.getElementById('calc-preview-val');
+const calcPreviewSub = document.getElementById('calc-preview-sub');
+
+let currentBalanceMode = 'direct'; // 'direct' or 'calc'
+
+function setBalanceMode(mode) {
+  currentBalanceMode = mode;
+  const activeBtnClass = "flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20";
+  const inactiveBtnClass = "flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center gap-1.5";
+
+  if (mode === 'calc') {
+    if (btnBalanceModeCalc) btnBalanceModeCalc.className = activeBtnClass;
+    if (btnBalanceModeDirect) btnBalanceModeDirect.className = inactiveBtnClass;
+    if (sectionBalanceCalc) sectionBalanceCalc.classList.remove('hidden');
+    if (sectionBalanceDirect) sectionBalanceDirect.classList.add('hidden');
+    if (inputCalcWagered) inputCalcWagered.focus();
+  } else {
+    if (btnBalanceModeDirect) btnBalanceModeDirect.className = activeBtnClass;
+    if (btnBalanceModeCalc) btnBalanceModeCalc.className = inactiveBtnClass;
+    if (sectionBalanceDirect) sectionBalanceDirect.classList.remove('hidden');
+    if (sectionBalanceCalc) sectionBalanceCalc.classList.add('hidden');
+    if (inputAddBalanceVal) inputAddBalanceVal.focus();
+  }
+  updateCalcPreview();
+}
+
+function updateCalcPreview() {
+  if (!calcPreviewVal || !calcPreviewSub) return;
+  const wagered = parseFloat(inputCalcWagered ? inputCalcWagered.value : 0) || 0;
+  const returned = parseFloat(inputCalcReturned ? inputCalcReturned.value : 0) || 0;
+  const result = returned - wagered;
+
+  if (wagered === 0 && returned === 0) {
+    calcPreviewVal.textContent = 'R$ 0,00';
+    calcPreviewVal.className = 'text-base font-bold text-slate-300';
+    calcPreviewSub.textContent = 'Informe quanto apostou e quanto voltou.';
+    return;
+  }
+
+  if (result > 0) {
+    calcPreviewVal.textContent = `+${formatCurrency(result)}`;
+    calcPreviewVal.className = 'text-base font-bold text-emerald-400';
+    calcPreviewSub.textContent = `Lucro líquido de +${formatCurrency(result)} (Apostou: ${formatCurrency(wagered)} | Retornou: ${formatCurrency(returned)})`;
+  } else if (result < 0) {
+    calcPreviewVal.textContent = formatCurrency(result);
+    calcPreviewVal.className = 'text-base font-bold text-rose-400';
+    calcPreviewSub.textContent = `Prejuízo de ${formatCurrency(result)} (Apostou: ${formatCurrency(wagered)} | Retornou: ${formatCurrency(returned)})`;
+  } else {
+    calcPreviewVal.textContent = 'R$ 0,00';
+    calcPreviewVal.className = 'text-base font-bold text-slate-300';
+    calcPreviewSub.textContent = 'Retorno igual ao valor apostado (Empate / Devolvido).';
+  }
+}
+
+if (btnBalanceModeDirect) btnBalanceModeDirect.addEventListener('click', () => setBalanceMode('direct'));
+if (btnBalanceModeCalc) btnBalanceModeCalc.addEventListener('click', () => setBalanceMode('calc'));
+
+if (inputCalcWagered) inputCalcWagered.addEventListener('input', updateCalcPreview);
+if (inputCalcReturned) inputCalcReturned.addEventListener('input', updateCalcPreview);
 
 function openAddBalanceModal() {
   closeMobileMenu();
   if (!modalAddBalance) return;
-  inputAddBalanceVal.value = ''; // Always open empty for a new entry
+  if (inputAddBalanceVal) inputAddBalanceVal.value = '';
+  if (inputCalcWagered) inputCalcWagered.value = '';
+  if (inputCalcReturned) inputCalcReturned.value = '';
+  if (inputAddBalanceDesc) inputAddBalanceDesc.value = '';
+  setBalanceMode('direct');
   modalAddBalance.classList.remove('hidden');
-  setTimeout(() => inputAddBalanceVal.focus(), 50);
 }
 
 function closeAddBalanceModal() {
@@ -2016,10 +2088,25 @@ if (btnCancelAddBalance) btnCancelAddBalance.addEventListener('click', closeAddB
 if (formAddBalance) {
   formAddBalance.addEventListener('submit', (e) => {
     e.preventDefault();
-    const val = parseFloat(inputAddBalanceVal.value) || 0;
+    let val = 0;
+    let description = (inputAddBalanceDesc ? inputAddBalanceDesc.value : '').trim();
+
+    if (currentBalanceMode === 'calc') {
+      const wagered = parseFloat(inputCalcWagered ? inputCalcWagered.value : 0) || 0;
+      const returned = parseFloat(inputCalcReturned ? inputCalcReturned.value : 0) || 0;
+      val = returned - wagered;
+      if (!description) {
+        description = `Operação: Apostou ${formatCurrency(wagered)} / Retornou ${formatCurrency(returned)}`;
+      }
+    } else {
+      val = parseFloat(inputAddBalanceVal ? inputAddBalanceVal.value : 0) || 0;
+      if (!description) {
+        description = val >= 0 ? 'Adição de Saldo' : 'Retirada de Saldo';
+      }
+    }
     
     if (val !== 0) {
-      // Accumulate onto the global balance!
+      // Accumulate onto global balance
       globalBalance += val;
       
       // Save transaction to history list
@@ -2027,12 +2114,15 @@ if (formAddBalance) {
       const newTx = {
         id: 'tx-' + Date.now(),
         timestamp: new Date().toISOString(),
-        amount: val
+        amount: val,
+        description: description
       };
       history.push(newTx);
       saveBalanceHistory(history);
       
       updateGlobalCapital();
+      renderHistory();
+      if (typeof updateDashboardStats === 'function') updateDashboardStats();
     }
     closeAddBalanceModal();
   });
@@ -2052,7 +2142,9 @@ function saveBalanceHistory(history) {
 }
 
 function formatDateTime(isoString) {
+  if (!isoString) return '-';
   const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '-';
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
@@ -2082,19 +2174,21 @@ function renderHistory() {
 
   sorted.forEach(tx => {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-900/10 transition-colors';
+    tr.className = 'hover:bg-slate-900/20 transition-colors';
     
     const formattedDate = formatDateTime(tx.timestamp);
     const isPositive = tx.amount >= 0;
     const typeLabel = isPositive ? '🟢 Adição' : '🔴 Retirada';
-    const amountClass = isPositive ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold';
+    const amountClass = isPositive ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+    const descText = tx.description || (isPositive ? 'Adição de Saldo' : 'Retirada de Saldo');
     
     tr.innerHTML = `
-      <td class="py-3.5 pl-2 text-xs text-slate-400 font-medium">${formattedDate}</td>
-      <td class="py-3.5 text-xs font-bold text-slate-205">${typeLabel}</td>
+      <td class="py-3.5 pl-2 text-xs text-slate-400 font-medium whitespace-nowrap">${formattedDate}</td>
+      <td class="py-3.5 text-xs font-bold text-slate-200">${typeLabel}</td>
+      <td class="py-3.5 text-xs font-medium text-slate-300">${descText}</td>
       <td class="py-3.5 text-right text-xs ${amountClass}">${isPositive ? '+' : ''}${formatCurrency(tx.amount)}</td>
       <td class="py-3.5 text-right pr-2">
-        <button class="btn-delete-tx text-slate-500 hover:text-rose-500 p-1 hover:bg-slate-900 rounded-lg transition-colors" data-tx-id="${tx.id}" title="Desfazer Lançamento">
+        <button class="btn-delete-tx text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors" data-tx-id="${tx.id}" title="Desfazer Lançamento">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
         </button>
       </td>
