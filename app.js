@@ -1973,6 +1973,11 @@ daysContainer.addEventListener('change', (e) => {
 function calculateBankState() {
   const configuredBank = parseFloat(trackerData.bankInitialBalance || 0);
   const bankInitialDate = trackerData.bankInitialDate || null;
+  // Aportes e retiradas feitos no modal também fazem parte do saldo do Banco.
+  const manualTransactionsTotal = getBalanceHistory().reduce((total, transaction) => {
+    return total + (parseFloat(transaction.amount || 0) || 0);
+  }, 0);
+  const hasBankBalance = configuredBank !== 0 || manualTransactionsTotal !== 0;
 
   // Group ALL days by date string (YYYY-MM-DD)
   const daysByDate = {};
@@ -2062,7 +2067,7 @@ function calculateBankState() {
         bankImpact = dateNetProfit;
       }
 
-      if (configuredBank > 0) {
+      if (hasBankBalance) {
         totalBankImpact += bankImpact;
       }
 
@@ -2082,10 +2087,11 @@ function calculateBankState() {
     }
   });
 
-  const currentBankBalance = configuredBank === 0 ? 0 : (configuredBank + totalBankImpact);
+  const currentBankBalance = configuredBank + manualTransactionsTotal + totalBankImpact;
 
   return {
     manualInitialBalance: configuredBank,
+    manualTransactionsTotal,
     totalBankImpact,
     totalDaysWagered,
     totalDaysReturn,
@@ -2660,6 +2666,40 @@ function renderHistory() {
 
 let expandedSummaryDates = new Set();
 
+const summaryDateStartInput = document.getElementById('summary-date-start');
+const summaryDateEndInput = document.getElementById('summary-date-end');
+const btnSummaryThisWeek = document.getElementById('btn-summary-this-week');
+const btnSummaryThisMonth = document.getElementById('btn-summary-this-month');
+const btnSummaryClearDates = document.getElementById('btn-summary-clear-dates');
+
+function formatLocalDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function setSummaryDateRange(start, end) {
+  if (summaryDateStartInput) summaryDateStartInput.value = start || '';
+  if (summaryDateEndInput) summaryDateEndInput.value = end || '';
+  expandedSummaryDates.clear();
+  renderBetsSummary();
+}
+
+if (summaryDateStartInput) summaryDateStartInput.addEventListener('change', () => setSummaryDateRange(summaryDateStartInput.value, summaryDateEndInput ? summaryDateEndInput.value : ''));
+if (summaryDateEndInput) summaryDateEndInput.addEventListener('change', () => setSummaryDateRange(summaryDateStartInput ? summaryDateStartInput.value : '', summaryDateEndInput.value));
+if (btnSummaryClearDates) btnSummaryClearDates.addEventListener('click', () => setSummaryDateRange('', ''));
+if (btnSummaryThisWeek) btnSummaryThisWeek.addEventListener('click', () => {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  setSummaryDateRange(formatLocalDateInput(monday), formatLocalDateInput(today));
+});
+if (btnSummaryThisMonth) btnSummaryThisMonth.addEventListener('click', () => {
+  const today = new Date();
+  setSummaryDateRange(formatLocalDateInput(new Date(today.getFullYear(), today.getMonth(), 1)), formatLocalDateInput(today));
+});
+
 function renderBetsSummary() {
   const tbody = document.getElementById('bets-summary-table-body');
   const tfoot = document.getElementById('bets-summary-table-foot');
@@ -2684,7 +2724,14 @@ function renderBetsSummary() {
   let grandNetProfit = 0;
   let grandTotalBets = 0;
 
-  if (!trackerData.days || trackerData.days.length === 0) {
+  const startDate = summaryDateStartInput ? summaryDateStartInput.value : '';
+  const endDate = summaryDateEndInput ? summaryDateEndInput.value : '';
+  const daysInRange = (trackerData.days || []).filter(day => {
+    const date = day.date || '';
+    return (!startDate || date >= startDate) && (!endDate || date <= endDate);
+  });
+
+  if (daysInRange.length === 0) {
     if (emptyState) emptyState.classList.remove('hidden');
     if (summaryTotalStakedEl) summaryTotalStakedEl.textContent = formatCurrency(0);
     if (summaryTotalWonEl) summaryTotalWonEl.textContent = formatCurrency(0);
@@ -2702,7 +2749,7 @@ function renderBetsSummary() {
   // Group all sessions by calendar date (YYYY-MM-DD)
   const dateMap = {};
 
-  trackerData.days.forEach(day => {
+  daysInRange.forEach(day => {
     const dKey = day.date;
     if (!dateMap[dKey]) {
       dateMap[dKey] = {

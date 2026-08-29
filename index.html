@@ -618,6 +618,17 @@
               de cada dia.</p>
           </div>
           <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+            <div class="flex flex-wrap items-center gap-2 bg-slate-950/60 border border-slate-800 rounded-xl p-1.5">
+              <label class="text-[10px] text-slate-500 font-semibold pl-1" for="summary-date-start">De</label>
+              <input id="summary-date-start" type="date" aria-label="Data inicial do resumo"
+                class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200">
+              <label class="text-[10px] text-slate-500 font-semibold" for="summary-date-end">Até</label>
+              <input id="summary-date-end" type="date" aria-label="Data final do resumo"
+                class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200">
+              <button id="btn-summary-this-week" type="button" class="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 px-1.5 py-1" title="Filtrar esta semana">Semana</button>
+              <button id="btn-summary-this-month" type="button" class="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 px-1.5 py-1" title="Filtrar este mês">Mês</button>
+              <button id="btn-summary-clear-dates" type="button" class="text-[10px] font-semibold text-slate-400 hover:text-slate-200 px-1.5 py-1" title="Ver todo o período">Limpar</button>
+            </div>
             <span id="summary-days-count"
               class="text-xs px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 font-medium">
               0 dias
@@ -1279,7 +1290,7 @@
       <div class="flex items-center justify-between pb-4 border-b border-slate-900">
         <h4 id="modal-add-balance-title" class="text-base font-bold text-slate-100 flex items-center gap-2">
           <i data-lucide="dollar-sign" class="w-5 h-5 text-indigo-400"></i>
-          Lançar no Saldo da Banca
+          Lançar no Saldo do Banco
         </h4>
         <button id="modal-add-balance-close" type="button"
           class="text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors">
