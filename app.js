@@ -2460,13 +2460,20 @@ function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemRetur
   `;
 }
 
+function formatDayMonth(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  return `${parts[2]}/${parts[1]}`;
+}
+
+let bankFilterType = 'total'; // 'total', 'week', 'month', 'custom'
+
 function renderHistory() {
   try {
     const bankState = calculateBankState();
     const { manualInitialBalance, totalDaysWagered, totalDaysReturn, currentBankBalance, daySummaries } = bankState;
 
-    // O extrato começa compacto: os detalhes de cada sessão só aparecem
-    // quando o usuário clicar na respectiva linha.
     if (!historyExpandedInitialized) {
       expandedHistoryDates.clear();
       historyExpandedInitialized = true;
@@ -2479,13 +2486,130 @@ function renderHistory() {
       });
     });
 
-    const bankStatCurrentBalance = document.getElementById('bank-stat-current-balance');
-    const bankStatDaysProfit = document.getElementById('bank-stat-days-profit');
-    const bankStatVolume = document.getElementById('bank-stat-volume');
-    const bankStatReturn = document.getElementById('bank-stat-return');
-    const bankDaysProfitIconBg = document.getElementById('bank-days-profit-icon-bg');
+    const bankDateStartInput = document.getElementById('bank-date-start');
+    const bankDateEndInput = document.getElementById('bank-date-end');
 
+    const bankStartVal = bankDateStartInput ? bankDateStartInput.value : '';
+    const bankEndVal = bankDateEndInput ? bankDateEndInput.value : '';
+    const isFiltered = Boolean(bankStartVal || bankEndVal);
+
+    // Métricas na Data / Período no Banco (Se nenhum filtro ativo, calcula o total acumulado)
+    let dateProfit = 0;
+    let dateDeposits = 0;
+    let dateWagered = 0;
+    let dateReturn = 0;
+
+    (trackerData.days || []).forEach(day => {
+      const dStr = day.date || '';
+      if (!dStr) return;
+      if (bankStartVal && dStr < bankStartVal) return;
+      if (bankEndVal && dStr > bankEndVal) return;
+
+      (day.bets || []).forEach(bet => {
+        const stake = parseFloat(bet.stake || 0);
+        const odd = parseFloat(bet.odd || 0);
+        const isLay = bet.exchangeType === 'lay';
+        const liability = (isLay && stake > 0 && odd > 1) ? (stake * (odd - 1)) : 0;
+        const riskAmount = isLay ? liability : stake;
+        const betProfit = parseFloat(bet.profit || 0);
+
+        if (!bet.freebet) {
+          dateWagered += riskAmount;
+        }
+
+        if (bet.status === 'green') {
+          if (isLay) {
+            dateReturn += bet.freebet ? betProfit : (liability + betProfit);
+          } else {
+            dateReturn += bet.freebet ? betProfit : (stake + betProfit);
+          }
+        } else if (bet.status === 'refunded' && !bet.freebet) {
+          dateReturn += riskAmount;
+        }
+
+        dateProfit += betProfit;
+      });
+    });
+
+    const historyList = getBalanceHistory();
+    historyList.forEach(tx => {
+      const txDate = tx.timestamp ? tx.timestamp.slice(0, 10) : '';
+      if (!txDate) return;
+      if (bankStartVal && txDate < bankStartVal) return;
+      if (bankEndVal && txDate > bankEndVal) return;
+
+      const amt = parseFloat(tx.amount || 0);
+      if (amt > 0) {
+        dateDeposits += amt;
+      }
+    });
+
+    // Atualiza Tag Dinâmica do Período nos Cards: (total), (mês), (semana) ou (DD/MM-DD/MM)
+    let periodTagText = '(total)';
+    if (bankFilterType === 'week') {
+      periodTagText = '(semana)';
+    } else if (bankFilterType === 'month') {
+      periodTagText = '(mês)';
+    } else if (bankStartVal || bankEndVal) {
+      if (bankStartVal && bankEndVal) {
+        periodTagText = `(${formatDayMonth(bankStartVal)}-${formatDayMonth(bankEndVal)})`;
+      } else if (bankStartVal) {
+        periodTagText = `(desde ${formatDayMonth(bankStartVal)})`;
+      } else {
+        periodTagText = `(até ${formatDayMonth(bankEndVal)})`;
+      }
+    } else {
+      periodTagText = '(total)';
+    }
+
+    const bankCardPeriodTag = document.getElementById('bank-card-period-tag');
+    const bankCardDepositsTag = document.getElementById('bank-card-deposits-tag');
+    const bankCardVolumeTag = document.getElementById('bank-card-volume-tag');
+
+    if (bankCardPeriodTag) bankCardPeriodTag.textContent = periodTagText;
+    if (bankCardDepositsTag) bankCardDepositsTag.textContent = periodTagText;
+    if (bankCardVolumeTag) bankCardVolumeTag.textContent = periodTagText;
+
+    // Atualiza Card: Saldo do Banco
+    const bankStatCurrentBalance = document.getElementById('bank-stat-current-balance');
     if (bankStatCurrentBalance) bankStatCurrentBalance.textContent = formatCurrency(currentBankBalance);
+
+    // Atualiza Card: Ganho / Lucro do Período
+    const bankStatMonthProfit = document.getElementById('bank-stat-month-profit');
+    const bankStatMonthProfitSub = document.getElementById('bank-stat-month-profit-sub');
+    const bankMonthProfitIconBg = document.getElementById('bank-month-profit-icon-bg');
+
+    if (bankStatMonthProfit) {
+      bankStatMonthProfit.textContent = (dateProfit >= 0 ? '+' : '') + formatCurrency(dateProfit);
+      if (dateProfit > 0) {
+        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-emerald-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400';
+      } else if (dateProfit < 0) {
+        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-rose-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400';
+      } else {
+        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-indigo-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-indigo-900/60 rounded-lg text-indigo-400';
+      }
+    }
+
+    if (bankStatMonthProfitSub) {
+      bankStatMonthProfitSub.textContent = isFiltered ? 'Lucro de apostas no período' : 'Lucro acumulado nas apostas';
+    }
+
+    // Atualiza Card: Aportes no Período
+    const bankStatMonthDeposits = document.getElementById('bank-stat-month-deposits');
+    const bankStatMonthDepositsSub = document.getElementById('bank-stat-month-deposits-sub');
+    if (bankStatMonthDeposits) {
+      bankStatMonthDeposits.textContent = formatCurrency(dateDeposits);
+    }
+    if (bankStatMonthDepositsSub) {
+      bankStatMonthDepositsSub.textContent = isFiltered ? 'Saldos adicionados no período' : 'Saldos adicionados no total';
+    }
+
+    // Atualiza Card: Resultado Geral dos Dias
+    const bankStatDaysProfit = document.getElementById('bank-stat-days-profit');
+    const bankDaysProfitIconBg = document.getElementById('bank-days-profit-icon-bg');
 
     if (bankStatDaysProfit) {
       bankStatDaysProfit.textContent = (totalRealProfit >= 0 ? '+' : '') + formatCurrency(totalRealProfit);
@@ -2501,8 +2625,15 @@ function renderHistory() {
       }
     }
 
-    if (bankStatVolume) bankStatVolume.textContent = formatCurrency(totalDaysWagered);
-    if (bankStatReturn) bankStatReturn.textContent = formatCurrency(totalDaysReturn);
+    // Atualiza Card: Volume e Retorno no Período
+    const bankStatVolume = document.getElementById('bank-stat-volume');
+    const bankStatReturnSub = document.getElementById('bank-stat-return-sub');
+
+    if (bankStatVolume) bankStatVolume.textContent = formatCurrency(dateWagered);
+    if (bankStatReturnSub) {
+      bankStatReturnSub.textContent = `Retorno: ${formatCurrency(dateReturn)}`;
+      bankStatReturnSub.className = dateReturn >= dateWagered ? 'text-xs text-emerald-400 mt-1 font-semibold' : 'text-xs text-rose-400 mt-1 font-semibold';
+    }
 
     const tbody = document.getElementById('history-table-body');
     const emptyState = document.getElementById('history-empty-state');
@@ -2512,15 +2643,14 @@ function renderHistory() {
 
     const ledgerItems = [];
 
-    const history = getBalanceHistory();
-    history.forEach(tx => {
+    historyList.forEach(tx => {
       const amountVal = parseFloat(tx.amount || 0);
       const isPositive = amountVal >= 0;
       ledgerItems.push({
         id: tx.id,
         timestamp: tx.timestamp || new Date().toISOString(),
         category: 'manual',
-        typeLabel: isPositive ? '🟢 Depósito Inicial / Aporte' : '🔴 Retirada do Banco',
+        typeLabel: isPositive ? '🟢 Depósito / Aporte no Banco' : '🔴 Retirada do Banco',
         wageredText: '-',
         returnText: '-',
         resultText: isPositive ? `+${formatCurrency(amountVal)}` : formatCurrency(amountVal),
@@ -2578,17 +2708,7 @@ function renderHistory() {
 
     ledgerItems.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-    if (ledgerItems.length === 0) {
-      if (emptyState) emptyState.classList.remove('hidden');
-      return;
-    }
-
-    if (emptyState) emptyState.classList.add('hidden');
-
     const sortedAsc = [...ledgerItems].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    // O saldo inicial calculado pelo banco é a base do extrato acumulado.
-    // `configuredBank` só existe dentro de calculateBankState; referenciá-lo
-    // aqui interrompia a renderização de todas as linhas do extrato.
     let runningBal = manualInitialBalance;
     const runningBalances = {};
     sortedAsc.forEach(item => {
@@ -2596,7 +2716,25 @@ function renderHistory() {
       runningBalances[item.id] = runningBal;
     });
 
-    ledgerItems.forEach(item => {
+    // Aplica filtro por data de início/fim se informado
+    let visibleItems = ledgerItems;
+    if (bankStartVal || bankEndVal) {
+      visibleItems = ledgerItems.filter(item => {
+        const itemDate = item.dateKey || (item.timestamp ? item.timestamp.slice(0, 10) : '');
+        if (bankStartVal && itemDate < bankStartVal) return false;
+        if (bankEndVal && itemDate > bankEndVal) return false;
+        return true;
+      });
+    }
+
+    if (visibleItems.length === 0) {
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+
+    visibleItems.forEach(item => {
       const tr = document.createElement('tr');
       const isDayItem = item.category === 'day';
       const isExpanded = isDayItem && expandedHistoryDates.has(item.dateKey);
@@ -2663,6 +2801,50 @@ function renderHistory() {
     console.error('Erro em renderHistory:', err);
   }
 }
+
+// BANCO CENTRAL DATE FILTER LISTENERS
+const bankDateStartInput = document.getElementById('bank-date-start');
+const bankDateEndInput = document.getElementById('bank-date-end');
+const btnBankThisWeek = document.getElementById('btn-bank-this-week');
+const btnBankThisMonth = document.getElementById('btn-bank-this-month');
+const btnBankClearDates = document.getElementById('btn-bank-clear-dates');
+
+function setBankDateRange(start, end, filterType = 'custom') {
+  bankFilterType = filterType;
+  if (bankDateStartInput) bankDateStartInput.value = start || '';
+  if (bankDateEndInput) bankDateEndInput.value = end || '';
+  if (!start && !end) bankFilterType = 'total';
+  renderHistory();
+}
+
+if (btnBankThisWeek) {
+  btnBankThisWeek.addEventListener('click', () => {
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    setBankDateRange(formatLocalDateInput(monday), formatLocalDateInput(today), 'week');
+  });
+}
+
+if (btnBankThisMonth) {
+  btnBankThisMonth.addEventListener('click', () => {
+    const today = new Date();
+    setBankDateRange(formatLocalDateInput(new Date(today.getFullYear(), today.getMonth(), 1)), formatLocalDateInput(today), 'month');
+  });
+}
+
+if (btnBankClearDates) {
+  btnBankClearDates.addEventListener('click', () => setBankDateRange('', '', 'total'));
+}
+
+if (bankDateStartInput) bankDateStartInput.addEventListener('change', () => {
+  bankFilterType = 'custom';
+  renderHistory();
+});
+if (bankDateEndInput) bankDateEndInput.addEventListener('change', () => {
+  bankFilterType = 'custom';
+  renderHistory();
+});
 
 let expandedSummaryDates = new Set();
 
