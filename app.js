@@ -3476,7 +3476,7 @@ if (inputSearchFreebetDays) {
 // ==========================================
 
 let calcState = {
-  mode: 'surebet', // 'surebet' | 'freebet' | 'dutching' | 'riskfree'
+  mode: 'surebet', // 'surebet' | 'freebet'
   rounding: 'none', // 'none' | '1' | '5' | '10'
   entries: [
     { id: 1, house: '', odd: '', type: 'real', comm: '', calculatedStake: 0 },
@@ -3650,14 +3650,10 @@ function initBetTrackerCalculator() {
   // Selectores de Modo
   const btnModeSurebet = document.getElementById('calc-mode-surebet');
   const btnModeFreebet = document.getElementById('calc-mode-freebet');
-  const btnModeDutching = document.getElementById('calc-mode-dutching');
-  const btnModeRiskfree = document.getElementById('calc-mode-riskfree');
 
   const modeButtons = [
     { btn: btnModeSurebet, mode: 'surebet', name: 'Surebet & Arbitragem' },
-    { btn: btnModeFreebet, mode: 'freebet', name: 'Freebet (SNR/SR)' },
-    { btn: btnModeDutching, mode: 'dutching', name: 'Dutching' },
-    { btn: btnModeRiskfree, mode: 'riskfree', name: 'Sem Risco / Equalizar' }
+    { btn: btnModeFreebet, mode: 'freebet', name: 'Freebet (SNR/SR)' }
   ];
 
   modeButtons.forEach(item => {
@@ -3902,22 +3898,17 @@ function calculateBetTracker() {
 
   } else {
     // MODO PADRÃO SEM CADEADO: Distribuição regular por Investimento Total
-    if (calcState.mode === 'surebet' || calcState.mode === 'dutching') {
-      const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
-      rawStakes = multipliers.map(m => totalInv / (m * P));
-    } else if (calcState.mode === 'freebet') {
+    if (calcState.mode === 'freebet') {
       rawStakes[0] = totalInv;
       const targetNetWin1 = rawStakes[0] * multipliers[0];
       for (let i = 1; i < parsedEntries.length; i++) {
         const m = multipliers[i];
         rawStakes[i] = (m > 1) ? (targetNetWin1 / (m - 1)) : 0;
       }
-    } else if (calcState.mode === 'riskfree') {
-      rawStakes[0] = totalInv;
-      for (let i = 1; i < parsedEntries.length; i++) {
-        const m = multipliers[i];
-        rawStakes[i] = (m > 1) ? (rawStakes[0] / (m - 1)) : 0;
-      }
+    } else {
+      // Surebet / Arbitragem Padrão
+      const P = multipliers.reduce((acc, m) => acc + (1 / m), 0);
+      rawStakes = multipliers.map(m => totalInv / (m * P));
     }
   }
 
@@ -4009,9 +4000,7 @@ function calculateBetTracker() {
   if (resModeLabel) {
     const modeNames = {
       surebet: 'Arbitragem Normal',
-      freebet: 'Extração de Freebet',
-      dutching: 'Dutching Proporcional',
-      riskfree: 'Aposta Sem Risco'
+      freebet: 'Extração de Freebet'
     };
     resModeLabel.textContent = modeNames[calcState.mode] || 'Calculadora';
   }
