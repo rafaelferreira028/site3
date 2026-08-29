@@ -42,11 +42,7 @@ function loadLocalFallback() {
     if (!trackerData.days) trackerData.days = [];
     if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
 
-    // Sanitize: if bankInitialBalance exists but bankInitialDate does not,
-    // it came from an older/broken session — reset it so the user starts fresh
-    if (trackerData.bankInitialBalance && !trackerData.bankInitialDate) {
-      trackerData.bankInitialBalance = 0;
-    }
+
 
     globalBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
 
@@ -423,6 +419,7 @@ function updateBetCalculations(dayId, betId, rowElement) {
   // Update day header totals and global summary
   updateDaySummary(dayId);
   updateGlobalStats();
+  renderHistory();
 
   // Save to persistent storage
   debouncedSaveData();
@@ -1454,6 +1451,7 @@ function toggleDayStatus(dayId) {
   }
 
   updateGlobalStats();
+  renderHistory();
 }
 
 // ==========================================
@@ -1974,10 +1972,9 @@ daysContainer.addEventListener('change', (e) => {
 
 function calculateBankState() {
   const configuredBank = parseFloat(trackerData.bankInitialBalance || 0);
-  // bankInitialDate: the date the user set the bank value. Only days >= this date affect the balance.
   const bankInitialDate = trackerData.bankInitialDate || null;
 
-  // Group ALL days by date string (YYYY-MM-DD) — show everything in the extrato
+  // Group ALL days by date string (YYYY-MM-DD)
   const daysByDate = {};
   (trackerData.days || []).forEach(day => {
     const dStr = day.date || 'sem-data';
@@ -1985,10 +1982,10 @@ function calculateBankState() {
     daysByDate[dStr].push(day);
   });
 
-  let totalDaysProfit = 0;     // ONLY days >= bankInitialDate (affects bank balance)
-  let totalDaysWagered = 0;    // all days for stats
-  let totalDaysReturn = 0;     // all days for stats
-  const daySummaries = [];     // all days for extrato display
+  let totalBankImpact = 0;
+  let totalDaysWagered = 0;
+  let totalDaysReturn = 0;
+  const daySummaries = [];
 
   const sortedDatesAsc = Object.keys(daysByDate).sort((a, b) => a.localeCompare(b));
 
@@ -1999,6 +1996,8 @@ function calculateBankState() {
     let dateNetProfit = 0;
     let dateBetsCount = 0;
 
+    const isDayActive = sessions.some(d => d.active !== false);
+
     sessions.forEach(day => {
       (day.bets || []).forEach(bet => {
         dateBetsCount++;
@@ -2007,19 +2006,21 @@ function calculateBankState() {
         const isLay = bet.exchangeType === 'lay';
         const liability = (isLay && stake > 0 && odd > 1) ? (stake * (odd - 1)) : 0;
         const riskAmount = isLay ? liability : stake;
+        const betProfit = parseFloat(bet.profit || 0);
 
         if (!bet.freebet) dateWagered += riskAmount;
-        dateNetProfit += parseFloat(bet.profit || 0);
 
         if (bet.status === 'green') {
           if (isLay) {
-            dateReturn += bet.freebet ? parseFloat(bet.profit || 0) : (liability + parseFloat(bet.profit || 0));
+            dateReturn += bet.freebet ? betProfit : (liability + betProfit);
           } else {
-            dateReturn += bet.freebet ? parseFloat(bet.profit || 0) : (stake + parseFloat(bet.profit || 0));
+            dateReturn += bet.freebet ? betProfit : (stake + betProfit);
           }
         } else if (bet.status === 'refunded' && !bet.freebet) {
           dateReturn += riskAmount;
         }
+
+        dateNetProfit += betProfit;
       });
     });
 
@@ -2027,10 +2028,19 @@ function calculateBankState() {
       totalDaysWagered += dateWagered;
       totalDaysReturn += dateReturn;
 
-      // Only count profit toward bank balance for days STRICTLY AFTER the bank was set
-      const countsForBank = configuredBank > 0 && (!bankInitialDate || dateKey > bankInitialDate);
-      if (countsForBank) {
-        totalDaysProfit += dateNetProfit;
+      // IMPACTO NO BANCO:
+      // 1. Se Toggle ON (isDayActive === true): desconta o valor apostado (-dateWagered)
+      // 2. Se Toggle OFF (isDayActive === false) e a data for >= bankInitialDate: soma o lucro líquido (+dateNetProfit)
+      // 3. Dias anteriores a bankInitialDate com Toggle OFF já estão no Saldo Base do Banco (impacto = 0)
+      let bankImpact = 0;
+      if (isDayActive) {
+        bankImpact = -dateWagered;
+      } else if (!bankInitialDate || dateKey >= bankInitialDate) {
+        bankImpact = dateNetProfit;
+      }
+
+      if (configuredBank > 0) {
+        totalBankImpact += bankImpact;
       }
 
       daySummaries.push({
@@ -2038,19 +2048,18 @@ function calculateBankState() {
         dateWagered,
         dateReturn,
         dateNetProfit,
+        bankImpact,
         betsCount: dateBetsCount,
-        countsForBank
+        isDayActive
       });
     }
   });
 
-  // Saldo do Banco: ONLY the user-defined value + results of days that happened after bank was set
-  // If bank not set (configuredBank === 0), show R$ 0,00
-  const currentBankBalance = configuredBank === 0 ? 0 : (configuredBank + totalDaysProfit);
+  const currentBankBalance = configuredBank === 0 ? 0 : (configuredBank + totalBankImpact);
 
   return {
     manualInitialBalance: configuredBank,
-    totalDaysProfit,
+    totalBankImpact,
     totalDaysWagered,
     totalDaysReturn,
     currentBankBalance,
@@ -2105,15 +2114,18 @@ function saveBankInitialValue() {
   const newVal = parseFloat(inputBankInitialVal.value) || 0;
   trackerData.bankInitialBalance = newVal;
   if (newVal > 0) {
-    // Record today as the bank start date — only days from today forward will affect the bank balance
-    // Use local date to avoid timezone issues
-    const now = new Date();
-    const todayStr = now.getFullYear() + '-' +
-      String(now.getMonth() + 1).padStart(2, '0') + '-' +
-      String(now.getDate()).padStart(2, '0');
-    trackerData.bankInitialDate = todayStr;
+    const activeDays = (trackerData.days || []).filter(d => d.active !== false && d.date);
+    let targetDate = null;
+    if (activeDays.length > 0) {
+      targetDate = activeDays.reduce((min, d) => (d.date < min ? d.date : min), activeDays[0].date);
+    } else {
+      const now = new Date();
+      targetDate = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
+    }
+    trackerData.bankInitialDate = targetDate;
   } else {
-    // If zeroed out, clear the date too
     trackerData.bankInitialDate = null;
   }
   saveData();
@@ -2368,20 +2380,30 @@ function renderHistory() {
     });
   });
 
-  // Lançamentos por DIA (1 linha por dia de aposta - NÃO aposta por aposta)
+  // Lançamentos por DIA (1 linha por dia de aposta)
   daySummaries.forEach(day => {
-    const isPositive = day.dateNetProfit >= 0;
+    let resultText = '';
+    let amountClass = '';
+    
+    if (day.isDayActive) {
+      resultText = `-${formatCurrency(day.dateWagered)}`;
+      amountClass = 'text-amber-400 font-bold';
+    } else {
+      resultText = day.dateNetProfit >= 0 ? `+${formatCurrency(day.dateNetProfit)}` : formatCurrency(day.dateNetProfit);
+      amountClass = day.dateNetProfit > 0 ? 'text-emerald-400 font-bold' : (day.dateNetProfit < 0 ? 'text-rose-400 font-bold' : 'text-slate-400 font-bold');
+    }
+
     ledgerItems.push({
       id: 'day-' + day.dateKey,
       timestamp: day.dateKey + 'T23:59:59.000Z',
       category: 'day',
-      typeLabel: `<span class="flex items-center gap-1.5 font-semibold text-indigo-400"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'})</span>`,
+      typeLabel: `<span class="flex items-center gap-1.5 font-semibold ${day.isDayActive ? 'text-emerald-400' : 'text-indigo-400'}"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'}) ${day.isDayActive ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-bold">EM ANDAMENTO</span>' : ''}</span>`,
       wageredText: formatCurrency(day.dateWagered),
-      returnText: formatCurrency(day.dateReturn),
-      resultText: isPositive ? `+${formatCurrency(day.dateNetProfit)}` : formatCurrency(day.dateNetProfit),
-      amountClass: isPositive ? 'text-emerald-400 font-bold' : (day.dateNetProfit < 0 ? 'text-rose-400 font-bold' : 'text-slate-400 font-bold'),
+      returnText: day.isDayActive ? 'Em andamento' : formatCurrency(day.dateReturn),
+      resultText: resultText,
+      amountClass: amountClass,
       isDeletable: false,
-      amount: day.dateNetProfit,
+      amount: day.bankImpact,
       formattedDate: formatDate(day.dateKey)
     });
   });
@@ -2398,7 +2420,7 @@ function renderHistory() {
 
   // Compute running cumulative balance after each transaction
   const sortedAsc = [...ledgerItems].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  let runningBal = 0;
+  let runningBal = configuredBank;
   const runningBalances = {};
   sortedAsc.forEach(item => {
     runningBal += item.amount;
@@ -4927,6 +4949,7 @@ async function handleAuthSubmit(e) {
         showAuthAlert(translateAuthError(error), 'error');
       } else if (data && data.session) {
         showAuthAlert('Login realizado com sucesso! Redirecionando...', 'success');
+        await updateAppForSession(data.session);
       }
     } else {
       const { data, error } = await supabaseClient.auth.signUp({
@@ -4939,6 +4962,7 @@ async function handleAuthSubmit(e) {
       } else {
         if (data && data.session) {
           showAuthAlert('Conta criada e logada com sucesso! Bem-vindo.', 'success');
+          await updateAppForSession(data.session);
         } else if (data && data.user) {
           showAuthAlert('Conta criada com sucesso! Se necessário, confirme seu e-mail antes de fazer login.', 'info');
           switchAuthMode('login');
