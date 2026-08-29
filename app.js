@@ -860,7 +860,7 @@ function updateGlobalStats() {
 // Create DOM elements for a Betting Day
 function createDayElement(day) {
   const div = document.createElement('div');
-  div.className = 'glass-card rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all-300 animate-slide-down';
+  div.className = 'dashboard-session glass-card rounded-xl border border-slate-800 overflow-hidden shadow-sm transition-all-300 animate-slide-down';
   div.setAttribute('data-day-id', day.id);
 
   div.innerHTML = `
@@ -1180,7 +1180,7 @@ function renderAllDays(filterQuery = '') {
     });
 
     const dateCard = document.createElement('div');
-    dateCard.className = 'glass-card rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
+    dateCard.className = 'dashboard-date-group glass-card rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
     dateCard.setAttribute('data-date-key', dateKey);
 
     const formattedDate = formatDate(dateKey);
@@ -1240,8 +1240,8 @@ function renderAllDays(filterQuery = '') {
         </div>
       </div>
 
-      <div class="date-group-content ${isExpanded ? '' : 'hidden'} p-3 md:p-4 space-y-4 border-t border-slate-800/80 bg-slate-950/40">
-        <div class="date-sessions-container space-y-4"></div>
+      <div class="date-group-content ${isExpanded ? '' : 'hidden'} p-2 md:p-3 border-t border-slate-800/80 bg-slate-950/40">
+        <div class="date-sessions-container space-y-2"></div>
       </div>
     `;
 
@@ -1996,10 +1996,14 @@ function calculateBankState() {
     let dateNetProfit = 0;
     let dateBetsCount = 0;
     const dateBets = [];
+    const sessionSummaries = [];
 
     const isDayActive = sessions.some(d => d.active !== false);
 
-    sessions.forEach(day => {
+    sessions.forEach((day, sessionIndex) => {
+      let sessionWagered = 0;
+      let sessionReturn = 0;
+      let sessionProfit = 0;
       (day.bets || []).forEach(bet => {
         dateBetsCount++;
         dateBets.push({
@@ -2013,19 +2017,33 @@ function calculateBankState() {
         const riskAmount = isLay ? liability : stake;
         const betProfit = parseFloat(bet.profit || 0);
 
-        if (!bet.freebet) dateWagered += riskAmount;
+        if (!bet.freebet) {
+          dateWagered += riskAmount;
+          sessionWagered += riskAmount;
+        }
 
         if (bet.status === 'green') {
           if (isLay) {
             dateReturn += bet.freebet ? betProfit : (liability + betProfit);
+            sessionReturn += bet.freebet ? betProfit : (liability + betProfit);
           } else {
             dateReturn += bet.freebet ? betProfit : (stake + betProfit);
+            sessionReturn += bet.freebet ? betProfit : (stake + betProfit);
           }
         } else if (bet.status === 'refunded' && !bet.freebet) {
           dateReturn += riskAmount;
+          sessionReturn += riskAmount;
         }
 
         dateNetProfit += betProfit;
+        sessionProfit += betProfit;
+      });
+
+      sessionSummaries.push({
+        title: day.notes && day.notes.trim() ? day.notes.trim() : `Aposta #${sessionIndex + 1}`,
+        wagered: sessionWagered,
+        returned: sessionReturn,
+        profit: sessionProfit
       });
     });
 
@@ -2054,9 +2072,12 @@ function calculateBankState() {
         dateReturn,
         dateNetProfit,
         bankImpact,
-        betsCount: dateBetsCount,
+        // Para a interface, cada sessão cadastrada representa uma aposta do dia.
+        // Os registros dentro da sessão continuam sendo usados nos cálculos.
+        betsCount: sessions.length,
         isDayActive,
-        bets: dateBets
+        bets: dateBets,
+        sessions: sessionSummaries
       });
     }
   });
@@ -2321,7 +2342,35 @@ function formatDateTime(isoString) {
 let expandedHistoryDates = new Set();
 let historyExpandedInitialized = false;
 
-function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemReturnText, itemDateReturn, itemDateWagered) {
+function renderHistorySessionsHtml(sessions, displayDate, itemWageredText, itemReturnText) {
+  const list = Array.isArray(sessions) ? sessions : [];
+  if (list.length === 0) return '';
+
+  const rows = list.map((session, index) => {
+    const profit = parseFloat(session.profit || 0);
+    const profitClass = profit > 0 ? 'text-emerald-400' : (profit < 0 ? 'text-rose-400' : 'text-slate-400');
+    return `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 text-xs">
+        <span class="font-semibold text-slate-200">${session.title || `Aposta #${index + 1}`}</span>
+        <div class="flex items-center gap-3 text-[11px] shrink-0">
+          <span class="text-slate-400">Apostado: <strong class="text-slate-200">${formatCurrency(session.wagered || 0)}</strong></span>
+          <span class="text-slate-400">Retorno: <strong class="text-emerald-400">${formatCurrency(session.returned || 0)}</strong></span>
+          <span class="font-bold min-w-[70px] text-right ${profitClass}">${profit > 0 ? '+' : ''}${formatCurrency(profit)}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="bg-slate-900/70 rounded-xl p-3.5 border border-slate-800/80 space-y-2.5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-bold text-slate-300 border-b border-slate-800/80 pb-2">
+        <span class="flex items-center gap-1.5 text-indigo-400"><i data-lucide="list" class="w-4 h-4"></i>Apostas do Dia em ${displayDate} (${list.length} ${list.length === 1 ? 'aposta' : 'apostas'}):</span>
+        <span class="text-[11px] text-slate-400 font-normal">Apostado: <strong class="text-slate-200">${itemWageredText}</strong> | Retorno: <strong class="text-emerald-400">${itemReturnText}</strong></span>
+      </div>
+      <div class="space-y-1.5">${rows}</div>
+    </div>`;
+}
+
+function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemReturnText, itemDateReturn, itemDateWagered, sessionsCount = betsList.length) {
   if (!Array.isArray(betsList) || betsList.length === 0) {
     return `
       <div class="bg-slate-900/70 rounded-xl p-3 border border-slate-800/80">
@@ -2394,7 +2443,7 @@ function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemRetur
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-bold text-slate-300 border-b border-slate-800/80 pb-2">
         <span class="flex items-center gap-1.5 text-indigo-400">
           <i data-lucide="list" class="w-4 h-4"></i>
-          Apostas do Dia em ${displayDate} (${betsList.length} ${betsList.length === 1 ? 'aposta' : 'apostas'}):
+          Apostas do Dia em ${displayDate} (${sessionsCount} ${sessionsCount === 1 ? 'aposta' : 'apostas'}):
         </span>
         <span class="text-[11px] text-slate-400 font-normal">
           Apostado: <strong class="text-slate-200">${itemWageredText}</strong> | Retorno: <strong class="${(itemDateReturn >= itemDateWagered) ? 'text-emerald-400' : 'text-rose-400'}">${itemReturnText}</strong>
@@ -2408,10 +2457,12 @@ function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemRetur
 function renderHistory() {
   try {
     const bankState = calculateBankState();
-    const { totalDaysWagered, totalDaysReturn, currentBankBalance, daySummaries } = bankState;
+    const { manualInitialBalance, totalDaysWagered, totalDaysReturn, currentBankBalance, daySummaries } = bankState;
 
-    if (!historyExpandedInitialized && daySummaries.length > 0) {
-      daySummaries.forEach(d => expandedHistoryDates.add(d.dateKey));
+    // O extrato começa compacto: os detalhes de cada sessão só aparecem
+    // quando o usuário clicar na respectiva linha.
+    if (!historyExpandedInitialized) {
+      expandedHistoryDates.clear();
       historyExpandedInitialized = true;
     }
 
@@ -2512,6 +2563,7 @@ function renderHistory() {
         formattedDate: formatDate(day.dateKey),
         dateKey: day.dateKey,
         bets: day.bets || [],
+        sessions: day.sessions || [],
         dateWagered: day.dateWagered,
         dateReturn: day.dateReturn,
         isDayActive: day.isDayActive
@@ -2528,7 +2580,10 @@ function renderHistory() {
     if (emptyState) emptyState.classList.add('hidden');
 
     const sortedAsc = [...ledgerItems].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    let runningBal = configuredBank;
+    // O saldo inicial calculado pelo banco é a base do extrato acumulado.
+    // `configuredBank` só existe dentro de calculateBankState; referenciá-lo
+    // aqui interrompia a renderização de todas as linhas do extrato.
+    let runningBal = manualInitialBalance;
     const runningBalances = {};
     sortedAsc.forEach(item => {
       runningBal += item.amount;
@@ -2569,10 +2624,10 @@ function renderHistory() {
         subTr.id = `history-subrow-${item.dateKey}`;
         subTr.className = `${isExpanded ? '' : 'hidden'} bg-slate-950/80 border-b border-slate-900/60`;
 
-        const betsList = item.bets || [];
+        const sessionList = item.sessions || [];
         subTr.innerHTML = `
           <td colspan="7" class="py-3 px-3 sm:px-6">
-            ${renderHistoryBetsHtml(betsList, displayDate, item.wageredText, item.returnText, item.dateReturn, item.dateWagered)}
+            ${renderHistorySessionsHtml(sessionList, displayDate, item.wageredText, item.returnText)}
           </td>
         `;
 
