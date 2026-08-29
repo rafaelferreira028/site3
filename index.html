@@ -265,8 +265,8 @@
       </button>
       <button id="tab-history"
         class="px-4 md:px-5 py-3 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors flex items-center gap-2 shrink-0">
-        <i data-lucide="history" class="w-4 h-4"></i>
-        Histórico de Saldo
+        <i data-lucide="landmark" class="w-4 h-4 text-emerald-400"></i>
+        Banco Central
       </button>
       <button id="tab-notes"
         class="px-4 md:px-5 py-3 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors flex items-center gap-2 shrink-0">
@@ -417,45 +417,135 @@
       </section>
     </div>
 
-    <!-- Conteúdo: Histórico de Saldo -->
+    <!-- Conteúdo: Banco Central (Gestão por Dia) -->
     <div id="content-history" class="hidden space-y-6">
-      <div class="glass-card rounded-2xl border border-slate-800 p-5 md:p-6 shadow-lg">
-        <div
-          class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-900 mb-6">
+      
+      <!-- Cartões Informativos do Banco -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        <!-- Card 1: Saldo do Banco (Principal com botão Definir) -->
+        <div id="card-bank-current" class="glass-card rounded-2xl p-5 border border-emerald-500/30 bg-emerald-950/10 flex flex-col justify-between transition-all duration-300 glow-green">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-semibold tracking-wider uppercase text-emerald-400">Saldo do Banco</span>
+            <button id="btn-edit-bank-initial" type="button" class="p-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg border border-emerald-500/30 transition-colors flex items-center gap-1 text-[11px] font-semibold" title="Clique para definir/editar o valor base do Banco">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              <span>Definir</span>
+            </button>
+          </div>
+          <div class="mt-3">
+            <div id="bank-initial-display-wrap" class="flex items-center gap-2">
+              <span id="bank-stat-current-balance" class="text-2xl font-bold tracking-tight text-emerald-400">R$ 0,00</span>
+            </div>
+            <div id="bank-initial-input-wrap" class="hidden flex items-center gap-2 mt-1">
+              <div class="relative flex-1">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-semibold">R$</span>
+                <input type="number" id="input-bank-initial-val" step="0.01" placeholder="1000,00" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-2 py-1.5 text-sm text-slate-100 font-bold focus:border-indigo-500">
+              </div>
+              <button id="btn-save-bank-initial" type="button" class="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-xl text-xs font-semibold transition-colors" title="Salvar Valor do Banco">
+                <i data-lucide="check" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <p class="text-xs text-emerald-400/80 mt-1 font-medium">Saldo do Banco (Separado da Banca)</p>
+          </div>
+        </div>
+
+        <!-- Card 2: Resultado dos Dias -->
+        <div id="card-bank-days-profit" class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-semibold tracking-wider uppercase">Resultado dos Dias</span>
+            <div id="bank-days-profit-icon-bg" class="p-2 bg-slate-900/60 rounded-lg text-indigo-400">
+              <i data-lucide="trending-up" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-4">
+            <span id="bank-stat-days-profit" class="text-2xl font-bold tracking-tight text-slate-100">R$ 0,00</span>
+            <p id="bank-stat-days-profit-sub" class="text-xs text-slate-400 mt-1">Lucro/Prejuízo acumulado nos dias</p>
+          </div>
+        </div>
+
+        <!-- Card 3: Total Apostado (Dias) -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-semibold tracking-wider uppercase">Total Apostado</span>
+            <div class="p-2 bg-slate-900/60 rounded-lg text-amber-400">
+              <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-4">
+            <span id="bank-stat-volume" class="text-2xl font-bold tracking-tight text-slate-100">R$ 0,00</span>
+            <p class="text-xs text-slate-400 mt-1">Volume apostado nas sessões</p>
+          </div>
+        </div>
+
+        <!-- Card 4: Total Retornado (Dias) -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-semibold tracking-wider uppercase">Total Retornado</span>
+            <div class="p-2 bg-slate-900/60 rounded-lg text-indigo-400">
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-4">
+            <span id="bank-stat-return" class="text-2xl font-bold tracking-tight text-slate-100">R$ 0,00</span>
+            <p class="text-xs text-slate-400 mt-1">Retorno total obtido nos dias</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Seção Principal do Extrato do Banco por Dia -->
+      <div class="glass-card rounded-2xl border border-slate-800 p-5 md:p-6 shadow-lg space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-900">
           <div>
             <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
-              Histórico de Saldo
+              <i data-lucide="landmark" class="w-5 h-5 text-emerald-400"></i>
+              Extrato do Banco (Resultado por Dia & Lançamentos)
             </h3>
-            <p class="text-xs text-slate-450 mt-1">Registro de todas as adições e retiradas de saldo efetuadas.</p>
+            <p class="text-xs text-slate-450 mt-1">Lançamentos consolidados por DIA de aposta e movimentações financeiras do Banco.</p>
           </div>
-          <button id="btn-clear-history"
-            class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-455 border border-rose-500/20 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 self-start sm:self-auto">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            Limpar Todo Histórico
-          </button>
+
+          <div class="flex items-center gap-2">
+            <!-- Botão Depositar no Banco -->
+            <button id="btn-bank-deposit" type="button"
+              class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 shadow-lg shadow-indigo-600/20">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              Depositar no Banco
+            </button>
+
+            <!-- Botão Limpar Histórico Manual -->
+            <button id="btn-clear-history" type="button"
+              class="bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-rose-400 border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
+              title="Limpar Lançamentos Manuais">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              Limpar Lançamentos
+            </button>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-300">
             <thead>
               <tr class="border-b border-slate-900 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
-                <th class="pb-3 pl-2">Data e Hora</th>
-                <th class="pb-3">Tipo</th>
-                <th class="pb-3">Descrição / Operação</th>
-                <th class="pb-3 text-right">Valor</th>
+                <th class="pb-3 pl-2">Data do Lançamento</th>
+                <th class="pb-3">Tipo / Origem</th>
+                <th class="pb-3 text-right">Apostado no Dia</th>
+                <th class="pb-3 text-right">Retornou no Dia</th>
+                <th class="pb-3 text-right">Resultado do Dia</th>
+                <th class="pb-3 text-right">Saldo Resultante (Banco)</th>
                 <th class="pb-3 text-right pr-2">Ações</th>
               </tr>
             </thead>
             <tbody id="history-table-body" class="divide-y divide-slate-900/40">
-              <!-- Instantiated dynamically -->
+              <!-- Renderizado dinamicamente via JS (1 linha por dia de aposta + depósitos manuais) -->
             </tbody>
           </table>
+
           <div id="history-empty-state" class="text-center py-12 text-slate-450 hidden">
             <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800 text-slate-500 w-fit mx-auto mb-3">
-              <i data-lucide="receipt" class="w-8 h-8"></i>
+              <i data-lucide="landmark" class="w-8 h-8"></i>
             </div>
-            <p class="text-sm font-medium">Nenhum lançamento de saldo registrado no histórico.</p>
+            <p class="text-sm font-medium">Nenhuma movimentação registrada no Banco Central.</p>
+            <p class="text-xs text-slate-500 mt-1">Deposite um valor inicial ou crie um dia de apostas para ver os lançamentos.</p>
           </div>
         </div>
       </div>

@@ -42,6 +42,12 @@ function loadLocalFallback() {
     if (!trackerData.days) trackerData.days = [];
     if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
 
+    // Sanitize: if bankInitialBalance exists but bankInitialDate does not,
+    // it came from an older/broken session — reset it so the user starts fresh
+    if (trackerData.bankInitialBalance && !trackerData.bankInitialDate) {
+      trackerData.bankInitialBalance = 0;
+    }
+
     globalBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
 
     const histStored = localStorage.getItem('planilhagulosa_balance_history');
@@ -1962,31 +1968,168 @@ daysContainer.addEventListener('change', (e) => {
   updateBetCalculations(dayId, betId, betRow);
 });
 
-// Recompute the global capital and updated bankroll
+// ==========================================
+// BANCO CENTRAL (GESTÃO POR DIA) LOGIC
+// ==========================================
+
+function calculateBankState() {
+  const configuredBank = parseFloat(trackerData.bankInitialBalance || 0);
+  // bankInitialDate: the date the user set the bank value. Only days >= this date affect the balance.
+  const bankInitialDate = trackerData.bankInitialDate || null;
+
+  // Group ALL days by date string (YYYY-MM-DD) — show everything in the extrato
+  const daysByDate = {};
+  (trackerData.days || []).forEach(day => {
+    const dStr = day.date || 'sem-data';
+    if (!daysByDate[dStr]) daysByDate[dStr] = [];
+    daysByDate[dStr].push(day);
+  });
+
+  let totalDaysProfit = 0;     // ONLY days >= bankInitialDate (affects bank balance)
+  let totalDaysWagered = 0;    // all days for stats
+  let totalDaysReturn = 0;     // all days for stats
+  const daySummaries = [];     // all days for extrato display
+
+  const sortedDatesAsc = Object.keys(daysByDate).sort((a, b) => a.localeCompare(b));
+
+  sortedDatesAsc.forEach(dateKey => {
+    const sessions = daysByDate[dateKey];
+    let dateWagered = 0;
+    let dateReturn = 0;
+    let dateNetProfit = 0;
+    let dateBetsCount = 0;
+
+    sessions.forEach(day => {
+      (day.bets || []).forEach(bet => {
+        dateBetsCount++;
+        const stake = parseFloat(bet.stake || 0);
+        const odd = parseFloat(bet.odd || 0);
+        const isLay = bet.exchangeType === 'lay';
+        const liability = (isLay && stake > 0 && odd > 1) ? (stake * (odd - 1)) : 0;
+        const riskAmount = isLay ? liability : stake;
+
+        if (!bet.freebet) dateWagered += riskAmount;
+        dateNetProfit += parseFloat(bet.profit || 0);
+
+        if (bet.status === 'green') {
+          if (isLay) {
+            dateReturn += bet.freebet ? parseFloat(bet.profit || 0) : (liability + parseFloat(bet.profit || 0));
+          } else {
+            dateReturn += bet.freebet ? parseFloat(bet.profit || 0) : (stake + parseFloat(bet.profit || 0));
+          }
+        } else if (bet.status === 'refunded' && !bet.freebet) {
+          dateReturn += riskAmount;
+        }
+      });
+    });
+
+    if (dateBetsCount > 0 || dateWagered > 0 || dateNetProfit !== 0) {
+      totalDaysWagered += dateWagered;
+      totalDaysReturn += dateReturn;
+
+      // Only count profit toward bank balance for days STRICTLY AFTER the bank was set
+      const countsForBank = configuredBank > 0 && (!bankInitialDate || dateKey > bankInitialDate);
+      if (countsForBank) {
+        totalDaysProfit += dateNetProfit;
+      }
+
+      daySummaries.push({
+        dateKey,
+        dateWagered,
+        dateReturn,
+        dateNetProfit,
+        betsCount: dateBetsCount,
+        countsForBank
+      });
+    }
+  });
+
+  // Saldo do Banco: ONLY the user-defined value + results of days that happened after bank was set
+  // If bank not set (configuredBank === 0), show R$ 0,00
+  const currentBankBalance = configuredBank === 0 ? 0 : (configuredBank + totalDaysProfit);
+
+  return {
+    manualInitialBalance: configuredBank,
+    totalDaysProfit,
+    totalDaysWagered,
+    totalDaysReturn,
+    currentBankBalance,
+    daySummaries
+  };
+}
+
+// Recompute global capital (Banca Atualizada no cabeçalho = Resultado acumulado das apostas)
 function updateGlobalCapital() {
   const totalDisplay = document.getElementById('display-global-total');
   if (!totalDisplay) return;
 
-  const addedBalance = globalBalance;
-  
   let netProfit = 0;
-  trackerData.days.forEach(day => {
+  (trackerData.days || []).forEach(day => {
     (day.bets || []).forEach(bet => {
-      netProfit += bet.profit || 0;
+      netProfit += parseFloat(bet.profit || 0);
     });
   });
 
-  const updatedCapital = addedBalance + netProfit;
-  totalDisplay.textContent = formatCurrency(updatedCapital);
+  totalDisplay.textContent = (netProfit > 0 ? '+' : '') + formatCurrency(netProfit);
 
-  // Apply colors comparing Updated Bankroll to the Added Balance
-  if (updatedCapital > addedBalance) {
-    totalDisplay.className = 'text-xs font-bold mt-0.5 text-emerald-500';
-  } else if (updatedCapital < addedBalance) {
-    totalDisplay.className = 'text-xs font-bold mt-0.5 text-rose-500';
+  if (netProfit > 0) {
+    totalDisplay.className = 'text-xs font-bold mt-0.5 text-emerald-400';
+  } else if (netProfit < 0) {
+    totalDisplay.className = 'text-xs font-bold mt-0.5 text-rose-400';
   } else {
     totalDisplay.className = 'text-xs font-bold mt-0.5 text-slate-300';
   }
+}
+
+// Bank Initial Balance Edit Handlers
+const btnEditBankInitial = document.getElementById('btn-edit-bank-initial');
+const btnSaveBankInitial = document.getElementById('btn-save-bank-initial');
+const bankInitialDisplayWrap = document.getElementById('bank-initial-display-wrap');
+const bankInitialInputWrap = document.getElementById('bank-initial-input-wrap');
+const inputBankInitialVal = document.getElementById('input-bank-initial-val');
+
+if (btnEditBankInitial) {
+  btnEditBankInitial.addEventListener('click', () => {
+    const curVal = trackerData.bankInitialBalance !== undefined ? trackerData.bankInitialBalance : 0;
+    if (inputBankInitialVal) inputBankInitialVal.value = curVal ? curVal.toString() : '';
+    if (bankInitialDisplayWrap) bankInitialDisplayWrap.classList.add('hidden');
+    if (bankInitialInputWrap) bankInitialInputWrap.classList.remove('hidden');
+    setTimeout(() => {
+      if (inputBankInitialVal) inputBankInitialVal.focus();
+    }, 50);
+  });
+}
+
+function saveBankInitialValue() {
+  if (!inputBankInitialVal) return;
+  const newVal = parseFloat(inputBankInitialVal.value) || 0;
+  trackerData.bankInitialBalance = newVal;
+  if (newVal > 0) {
+    // Record today as the bank start date — only days from today forward will affect the bank balance
+    // Use local date to avoid timezone issues
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    trackerData.bankInitialDate = todayStr;
+  } else {
+    // If zeroed out, clear the date too
+    trackerData.bankInitialDate = null;
+  }
+  saveData();
+  if (bankInitialDisplayWrap) bankInitialDisplayWrap.classList.remove('hidden');
+  if (bankInitialInputWrap) bankInitialInputWrap.classList.add('hidden');
+  renderHistory();
+}
+
+if (btnSaveBankInitial) btnSaveBankInitial.addEventListener('click', saveBankInitialValue);
+if (inputBankInitialVal) {
+  inputBankInitialVal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveBankInitialValue();
+    }
+  });
 }
 
 // MODAL: ADICIONAR SALDO VIEW HANDLERS
@@ -2082,6 +2225,9 @@ function closeAddBalanceModal() {
 }
 
 if (btnAddBalanceModal) btnAddBalanceModal.addEventListener('click', openAddBalanceModal);
+const btnBankDeposit = document.getElementById('btn-bank-deposit');
+if (btnBankDeposit) btnBankDeposit.addEventListener('click', openAddBalanceModal);
+
 if (modalAddBalanceClose) modalAddBalanceClose.addEventListener('click', closeAddBalanceModal);
 if (btnCancelAddBalance) btnCancelAddBalance.addEventListener('click', closeAddBalanceModal);
 
@@ -2101,7 +2247,7 @@ if (formAddBalance) {
     } else {
       val = parseFloat(inputAddBalanceVal ? inputAddBalanceVal.value : 0) || 0;
       if (!description) {
-        description = val >= 0 ? 'Adição de Saldo' : 'Retirada de Saldo';
+        description = val >= 0 ? 'Depósito Inicial / Aporte no Banco' : 'Retirada de Saldo do Banco';
       }
     }
     
@@ -2155,47 +2301,137 @@ function formatDateTime(isoString) {
 }
 
 function renderHistory() {
+  const bankState = calculateBankState();
+  const { totalDaysWagered, totalDaysReturn, currentBankBalance, daySummaries } = bankState;
+
+  // Calcular resultado total real de TODAS as apostas (valor da banca)
+  let totalRealProfit = 0;
+  (trackerData.days || []).forEach(day => {
+    (day.bets || []).forEach(bet => {
+      totalRealProfit += parseFloat(bet.profit || 0);
+    });
+  });
+
+  // 1. Atualizar Cards de Métricas do Banco
+  const bankStatCurrentBalance = document.getElementById('bank-stat-current-balance');
+  const bankStatDaysProfit = document.getElementById('bank-stat-days-profit');
+  const bankStatVolume = document.getElementById('bank-stat-volume');
+  const bankStatReturn = document.getElementById('bank-stat-return');
+  const bankDaysProfitIconBg = document.getElementById('bank-days-profit-icon-bg');
+
+  if (bankStatCurrentBalance) {
+    bankStatCurrentBalance.textContent = formatCurrency(currentBankBalance);
+  }
+
+  if (bankStatDaysProfit) {
+    bankStatDaysProfit.textContent = (totalRealProfit >= 0 ? '+' : '') + formatCurrency(totalRealProfit);
+    if (totalRealProfit > 0) {
+      bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-emerald-400';
+      if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400';
+    } else if (totalRealProfit < 0) {
+      bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-rose-400';
+      if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400';
+    } else {
+      bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-slate-100';
+      if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-slate-900/60 rounded-lg text-indigo-400';
+    }
+  }
+
+  if (bankStatVolume) bankStatVolume.textContent = formatCurrency(totalDaysWagered);
+  if (bankStatReturn) bankStatReturn.textContent = formatCurrency(totalDaysReturn);
+
+  // 2. Montar Extrato do Banco por DIA
   const tbody = document.getElementById('history-table-body');
   const emptyState = document.getElementById('history-empty-state');
   if (!tbody) return;
 
   tbody.innerHTML = '';
-  
+
+  const ledgerItems = [];
+
+  // Lançamentos Manuais (Depósitos e Saques no Banco)
   const history = getBalanceHistory();
-  if (history.length === 0) {
+  history.forEach(tx => {
+    const amountVal = parseFloat(tx.amount || 0);
+    const isPositive = amountVal >= 0;
+    ledgerItems.push({
+      id: tx.id,
+      timestamp: tx.timestamp || new Date().toISOString(),
+      category: 'manual',
+      typeLabel: isPositive ? '🟢 Depósito Inicial / Aporte' : '🔴 Retirada do Banco',
+      wageredText: '-',
+      returnText: '-',
+      resultText: isPositive ? `+${formatCurrency(amountVal)}` : formatCurrency(amountVal),
+      amountClass: isPositive ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold',
+      isDeletable: true,
+      amount: amountVal
+    });
+  });
+
+  // Lançamentos por DIA (1 linha por dia de aposta - NÃO aposta por aposta)
+  daySummaries.forEach(day => {
+    const isPositive = day.dateNetProfit >= 0;
+    ledgerItems.push({
+      id: 'day-' + day.dateKey,
+      timestamp: day.dateKey + 'T23:59:59.000Z',
+      category: 'day',
+      typeLabel: `<span class="flex items-center gap-1.5 font-semibold text-indigo-400"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'})</span>`,
+      wageredText: formatCurrency(day.dateWagered),
+      returnText: formatCurrency(day.dateReturn),
+      resultText: isPositive ? `+${formatCurrency(day.dateNetProfit)}` : formatCurrency(day.dateNetProfit),
+      amountClass: isPositive ? 'text-emerald-400 font-bold' : (day.dateNetProfit < 0 ? 'text-rose-400 font-bold' : 'text-slate-400 font-bold'),
+      isDeletable: false,
+      amount: day.dateNetProfit,
+      formattedDate: formatDate(day.dateKey)
+    });
+  });
+
+  // Sort descending by timestamp
+  ledgerItems.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+  if (ledgerItems.length === 0) {
     if (emptyState) emptyState.classList.remove('hidden');
     return;
   }
 
   if (emptyState) emptyState.classList.add('hidden');
 
-  // Sort descending by timestamp
-  const sorted = [...history].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  // Compute running cumulative balance after each transaction
+  const sortedAsc = [...ledgerItems].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  let runningBal = 0;
+  const runningBalances = {};
+  sortedAsc.forEach(item => {
+    runningBal += item.amount;
+    runningBalances[item.id] = runningBal;
+  });
 
-  sorted.forEach(tx => {
+  ledgerItems.forEach(item => {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-900/20 transition-colors';
-    
-    const formattedDate = formatDateTime(tx.timestamp);
-    const isPositive = tx.amount >= 0;
-    const typeLabel = isPositive ? '🟢 Adição' : '🔴 Retirada';
-    const amountClass = isPositive ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-    const descText = tx.description || (isPositive ? 'Adição de Saldo' : 'Retirada de Saldo');
-    
+    tr.className = 'hover:bg-slate-900/30 transition-colors border-b border-slate-900/40';
+
+    const displayDate = item.formattedDate || formatDateTime(item.timestamp);
+    const endBal = runningBalances[item.id] !== undefined ? formatCurrency(runningBalances[item.id]) : '-';
+
     tr.innerHTML = `
-      <td class="py-3.5 pl-2 text-xs text-slate-400 font-medium whitespace-nowrap">${formattedDate}</td>
-      <td class="py-3.5 text-xs font-bold text-slate-200">${typeLabel}</td>
-      <td class="py-3.5 text-xs font-medium text-slate-300">${descText}</td>
-      <td class="py-3.5 text-right text-xs ${amountClass}">${isPositive ? '+' : ''}${formatCurrency(tx.amount)}</td>
+      <td class="py-3.5 pl-2 text-xs text-slate-300 font-medium whitespace-nowrap">${displayDate}</td>
+      <td class="py-3.5 text-xs">${item.typeLabel}</td>
+      <td class="py-3.5 text-right text-xs text-slate-400 font-medium">${item.wageredText}</td>
+      <td class="py-3.5 text-right text-xs text-slate-400 font-medium">${item.returnText}</td>
+      <td class="py-3.5 text-right text-xs ${item.amountClass}">${item.resultText}</td>
+      <td class="py-3.5 text-right text-xs font-bold text-slate-200">${endBal}</td>
       <td class="py-3.5 text-right pr-2">
-        <button class="btn-delete-tx text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors" data-tx-id="${tx.id}" title="Desfazer Lançamento">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
-        </button>
+        ${item.isDeletable ? `
+          <button class="btn-delete-tx text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors" data-tx-id="${item.id}" title="Desfazer Lançamento Manual">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
+          </button>
+        ` : `<span class="text-[10px] text-slate-600 font-semibold">Sessão</span>`}
       </td>
     `;
-    
+
     tbody.appendChild(tr);
   });
+
+  if (window.lucide) window.lucide.createIcons();
 }
 
 let expandedSummaryDates = new Set();
