@@ -2045,6 +2045,8 @@ function calculateBankState() {
       });
 
       sessionSummaries.push({
+        id: day.id,
+        dateKey: dateKey,
         title: day.notes && day.notes.trim() ? day.notes.trim() : `Aposta #${sessionIndex + 1}`,
         wagered: sessionWagered,
         returned: sessionReturn,
@@ -2348,6 +2350,62 @@ function formatDateTime(isoString) {
 let expandedHistoryDates = new Set();
 let historyExpandedInitialized = false;
 
+function goToBet(dayId, dateKey) {
+  activateDashboardTab();
+
+  const searchInput = document.getElementById('input-search-days');
+  if (searchInput && searchInput.value) {
+    searchInput.value = '';
+    renderAllDays('');
+  }
+
+  if (dayId) {
+    const day = (trackerData.days || []).find(d => d.id === dayId);
+    if (day) {
+      day.expanded = true;
+      renderAllDays(searchInput ? searchInput.value : '');
+    }
+  }
+
+  setTimeout(() => {
+    let targetEl = null;
+
+    if (dayId) {
+      targetEl = document.querySelector(`[data-day-id="${dayId}"]`);
+    }
+
+    if (!targetEl && dateKey) {
+      targetEl = document.querySelector(`[data-date-key="${dateKey}"]`);
+    }
+
+    if (targetEl) {
+      const dateGroup = targetEl.closest('.dashboard-date-group');
+      if (dateGroup) {
+        const contentDiv = dateGroup.querySelector('.date-group-content');
+        const chevron = dateGroup.querySelector('.date-chevron-icon');
+        if (contentDiv && contentDiv.classList.contains('hidden')) {
+          contentDiv.classList.remove('hidden');
+          if (chevron) chevron.classList.add('rotate-90');
+        }
+      }
+
+      const dayContent = targetEl.querySelector('.day-content');
+      if (dayContent && dayContent.classList.contains('hidden')) {
+        dayContent.classList.remove('hidden');
+        const chevron = targetEl.querySelector('.btn-toggle-expand i');
+        if (chevron) chevron.classList.add('rotate-90');
+      }
+
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      targetEl.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-slate-950', 'transition-all', 'duration-500');
+      setTimeout(() => {
+        targetEl.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-slate-950');
+      }, 3000);
+    }
+  }, 120);
+}
+
 function renderHistorySessionsHtml(sessions, displayDate, itemWageredText, itemReturnText) {
   const list = Array.isArray(sessions) ? sessions : [];
   if (list.length === 0) return '';
@@ -2355,10 +2413,17 @@ function renderHistorySessionsHtml(sessions, displayDate, itemWageredText, itemR
   const rows = list.map((session, index) => {
     const profit = parseFloat(session.profit || 0);
     const profitClass = profit > 0 ? 'text-emerald-400' : (profit < 0 ? 'text-rose-400' : 'text-slate-400');
+    const dayIdAttr = session.id ? `data-day-id="${session.id}"` : '';
+    const dateKeyAttr = session.dateKey ? `data-date-key="${session.dateKey}"` : '';
+
     return `
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 text-xs">
-        <span class="font-semibold text-slate-200">${session.title || `Aposta #${index + 1}`}</span>
-        <div class="flex items-center gap-3 text-[11px] shrink-0">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 hover:border-slate-700/80 transition-colors text-xs">
+        <span class="font-semibold text-slate-200 truncate">${session.title || `Aposta #${index + 1}`}</span>
+        <div class="flex items-center gap-2.5 text-[11px] shrink-0">
+          <button type="button" class="btn-go-to-bet flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded-md border border-indigo-500/30 transition-all shrink-0 cursor-pointer" ${dayIdAttr} ${dateKeyAttr} title="Ir para esta aposta na Planilha">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span>Ver aposta</span>
+          </button>
           <span class="text-slate-400">Apostado: <strong class="text-slate-200">${formatCurrency(session.wagered || 0)}</strong></span>
           <span class="text-slate-400">Retorno: <strong class="text-emerald-400">${formatCurrency(session.returned || 0)}</strong></span>
           <span class="font-bold min-w-[70px] text-right ${profitClass}">${profit > 0 ? '+' : ''}${formatCurrency(profit)}</span>
@@ -2780,6 +2845,15 @@ function renderHistory() {
     });
 
     tbody.onclick = (e) => {
+      const btnGoTo = e.target.closest('.btn-go-to-bet');
+      if (btnGoTo) {
+        e.stopPropagation();
+        const dayId = btnGoTo.dataset.dayId;
+        const dateKey = btnGoTo.dataset.dateKey;
+        goToBet(dayId, dateKey);
+        return;
+      }
+
       if (e.target.closest('.btn-delete-tx')) return;
       const mainRow = e.target.closest('tr[data-date-key]');
       if (!mainRow) return;
