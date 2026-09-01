@@ -1271,7 +1271,6 @@ function renderAllDays(filterQuery = '') {
     // Expand/collapse handler & Delete Date Group handler
     const headerEl = dateCard.querySelector('.date-group-header');
     const contentEl = dateCard.querySelector('.date-group-content');
-    const chevronIcon = dateCard.querySelector('.date-chevron-icon');
     const delDateGroupBtns = dateCard.querySelectorAll('.btn-delete-date-group');
     delDateGroupBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1281,19 +1280,20 @@ function renderAllDays(filterQuery = '') {
       });
     });
 
-    if (headerEl && contentEl && chevronIcon) {
+    if (headerEl && contentEl) {
       headerEl.addEventListener('click', (e) => {
         // Prevent toggle if clicking inside an inner button
         if (e.target.closest('button') && !e.target.closest('.btn-toggle-date-group')) {
           return;
         }
         const isHidden = contentEl.classList.contains('hidden');
+        const icon = dateCard.querySelector('.date-chevron-icon, .btn-toggle-date-group i, .btn-toggle-date-group svg');
         if (isHidden) {
           contentEl.classList.remove('hidden');
-          chevronIcon.classList.add('rotate-90');
+          if (icon) icon.classList.add('rotate-90');
         } else {
           contentEl.classList.add('hidden');
-          chevronIcon.classList.remove('rotate-90');
+          if (icon) icon.classList.remove('rotate-90');
         }
       });
     }
@@ -2382,7 +2382,7 @@ function goToBet(dayId, dateKey) {
       const dateGroup = targetEl.closest('.dashboard-date-group');
       if (dateGroup) {
         const contentDiv = dateGroup.querySelector('.date-group-content');
-        const chevron = dateGroup.querySelector('.date-chevron-icon');
+        const chevron = dateGroup.querySelector('.date-chevron-icon, .btn-toggle-date-group i, .btn-toggle-date-group svg');
         if (contentDiv && contentDiv.classList.contains('hidden')) {
           contentDiv.classList.remove('hidden');
           if (chevron) chevron.classList.add('rotate-90');
@@ -2392,7 +2392,7 @@ function goToBet(dayId, dateKey) {
       const dayContent = targetEl.querySelector('.day-content');
       if (dayContent && dayContent.classList.contains('hidden')) {
         dayContent.classList.remove('hidden');
-        const chevron = targetEl.querySelector('.btn-toggle-expand i');
+        const chevron = targetEl.querySelector('.btn-toggle-expand i, .btn-toggle-expand svg');
         if (chevron) chevron.classList.add('rotate-90');
       }
 
@@ -4661,17 +4661,17 @@ function renderFreebetDays(filterQuery = '') {
       // Expand/collapse handler
       const headerEl = dayCard.querySelector('.freebet-day-header');
       const contentEl = dayCard.querySelector('.freebet-day-content');
-      const chevronIcon = dayCard.querySelector('.chevron-icon');
 
-      if (headerEl && contentEl && chevronIcon) {
+      if (headerEl && contentEl) {
         headerEl.addEventListener('click', () => {
           const isHidden = contentEl.classList.contains('hidden');
+          const icon = dayCard.querySelector('.chevron-icon, .btn-toggle-freebet-day i, .btn-toggle-freebet-day svg');
           if (isHidden) {
             contentEl.classList.remove('hidden');
-            chevronIcon.classList.add('rotate-90');
+            if (icon) icon.classList.add('rotate-90');
           } else {
             contentEl.classList.add('hidden');
-            chevronIcon.classList.remove('rotate-90');
+            if (icon) icon.classList.remove('rotate-90');
           }
         });
       }
