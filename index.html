@@ -596,7 +596,10 @@
         <div
           class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
-            <span class="text-xs font-semibold tracking-wider uppercase">Total Apostado Geral</span>
+            <span class="text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5">
+              <span>Total Apostado Geral</span>
+              <span id="summary-card-staked-tag" class="text-[11px] font-bold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded-md border border-slate-800 normal-case">(total)</span>
+            </span>
             <div class="p-2 bg-slate-900/60 rounded-lg">
               <i data-lucide="wallet" class="w-4 h-4 text-slate-400"></i>
             </div>
@@ -611,7 +614,10 @@
         <div
           class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300">
           <div class="flex items-center justify-between text-slate-400">
-            <span class="text-xs font-semibold tracking-wider uppercase">Retorno Total Geral</span>
+            <span class="text-xs font-semibold tracking-wider uppercase flex items-center gap-1.5">
+              <span>Retorno Total Geral</span>
+              <span id="summary-card-won-tag" class="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-1.5 py-0.5 rounded-md border border-emerald-700/40 normal-case">(total)</span>
+            </span>
             <div class="p-2 bg-emerald-500/10 rounded-lg">
               <i data-lucide="arrow-up-right" class="w-4 h-4 text-emerald-400"></i>
             </div>
@@ -626,7 +632,11 @@
         <div id="summary-card-net-profit"
           class="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-neutral">
           <div class="flex items-center justify-between text-slate-400">
-            <span class="text-xs font-semibold tracking-wider uppercase">Lucro Líquido Geral</span>
+            <span class="text-xs font-semibold tracking-wider uppercase text-indigo-400 flex items-center gap-1.5">
+              <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+              <span>Lucro Líquido Geral</span>
+              <span id="summary-card-period-tag" class="text-[11px] font-bold text-indigo-300 bg-indigo-900/60 px-1.5 py-0.5 rounded-md border border-indigo-700/40 normal-case">(total)</span>
+            </span>
             <div class="p-2 bg-slate-900/60 rounded-lg" id="summary-icon-container-net-profit">
               <i data-lucide="dollar-sign" class="w-4 h-4 text-indigo-400"></i>
             </div>

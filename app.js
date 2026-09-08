@@ -2981,6 +2981,7 @@ if (bankDateEndInput) bankDateEndInput.addEventListener('change', () => {
   renderHistory();
 });
 
+let summaryFilterType = 'total'; // 'total', 'week', 'month', 'custom'
 let expandedSummaryDates = new Set();
 
 const summaryDateStartInput = document.getElementById('summary-date-start');
@@ -2996,25 +2997,33 @@ function formatLocalDateInput(date) {
   return `${year}-${month}-${day}`;
 }
 
-function setSummaryDateRange(start, end) {
+function setSummaryDateRange(start, end, filterType = 'custom') {
+  summaryFilterType = filterType;
   if (summaryDateStartInput) summaryDateStartInput.value = start || '';
   if (summaryDateEndInput) summaryDateEndInput.value = end || '';
+  if (!start && !end) summaryFilterType = 'total';
   expandedSummaryDates.clear();
   renderBetsSummary();
 }
 
-if (summaryDateStartInput) summaryDateStartInput.addEventListener('change', () => setSummaryDateRange(summaryDateStartInput.value, summaryDateEndInput ? summaryDateEndInput.value : ''));
-if (summaryDateEndInput) summaryDateEndInput.addEventListener('change', () => setSummaryDateRange(summaryDateStartInput ? summaryDateStartInput.value : '', summaryDateEndInput.value));
-if (btnSummaryClearDates) btnSummaryClearDates.addEventListener('click', () => setSummaryDateRange('', ''));
+if (summaryDateStartInput) summaryDateStartInput.addEventListener('change', () => {
+  summaryFilterType = 'custom';
+  renderBetsSummary();
+});
+if (summaryDateEndInput) summaryDateEndInput.addEventListener('change', () => {
+  summaryFilterType = 'custom';
+  renderBetsSummary();
+});
+if (btnSummaryClearDates) btnSummaryClearDates.addEventListener('click', () => setSummaryDateRange('', '', 'total'));
 if (btnSummaryThisWeek) btnSummaryThisWeek.addEventListener('click', () => {
   const today = new Date();
   const monday = new Date(today);
   monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-  setSummaryDateRange(formatLocalDateInput(monday), formatLocalDateInput(today));
+  setSummaryDateRange(formatLocalDateInput(monday), formatLocalDateInput(today), 'week');
 });
 if (btnSummaryThisMonth) btnSummaryThisMonth.addEventListener('click', () => {
   const today = new Date();
-  setSummaryDateRange(formatLocalDateInput(new Date(today.getFullYear(), today.getMonth(), 1)), formatLocalDateInput(today));
+  setSummaryDateRange(formatLocalDateInput(new Date(today.getFullYear(), today.getMonth(), 1)), formatLocalDateInput(today), 'month');
 });
 
 function renderBetsSummary() {
@@ -3030,6 +3039,35 @@ function renderBetsSummary() {
   const summaryNetProfitIconContainer = document.getElementById('summary-icon-container-net-profit');
   const summaryDaysCountEl = document.getElementById('summary-days-count');
 
+  const startDate = summaryDateStartInput ? summaryDateStartInput.value : '';
+  const endDate = summaryDateEndInput ? summaryDateEndInput.value : '';
+
+  // Dynamic period tag text on Resumo de Apostas cards (equal to Banco Central)
+  let periodTagText = '(total)';
+  if (summaryFilterType === 'week') {
+    periodTagText = '(semana)';
+  } else if (summaryFilterType === 'month') {
+    periodTagText = '(mês)';
+  } else if (startDate || endDate) {
+    if (startDate && endDate) {
+      periodTagText = `(${formatDayMonth(startDate)}-${formatDayMonth(endDate)})`;
+    } else if (startDate) {
+      periodTagText = `(desde ${formatDayMonth(startDate)})`;
+    } else {
+      periodTagText = `(até ${formatDayMonth(endDate)})`;
+    }
+  } else {
+    periodTagText = '(total)';
+  }
+
+  const summaryCardStakedTag = document.getElementById('summary-card-staked-tag');
+  const summaryCardWonTag = document.getElementById('summary-card-won-tag');
+  const summaryCardPeriodTag = document.getElementById('summary-card-period-tag');
+
+  if (summaryCardStakedTag) summaryCardStakedTag.textContent = periodTagText;
+  if (summaryCardWonTag) summaryCardWonTag.textContent = periodTagText;
+  if (summaryCardPeriodTag) summaryCardPeriodTag.textContent = periodTagText;
+
   if (!tbody) return;
 
   tbody.innerHTML = '';
@@ -3041,8 +3079,6 @@ function renderBetsSummary() {
   let grandNetProfit = 0;
   let grandTotalBets = 0;
 
-  const startDate = summaryDateStartInput ? summaryDateStartInput.value : '';
-  const endDate = summaryDateEndInput ? summaryDateEndInput.value : '';
   const daysInRange = (trackerData.days || []).filter(day => {
     const date = day.date || '';
     return (!startDate || date >= startDate) && (!endDate || date <= endDate);
