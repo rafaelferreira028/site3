@@ -2005,6 +2005,10 @@ function calculateBankState() {
 
     const isDayActive = sessions.some(d => d.active !== false);
 
+    let pendingWagered = 0;
+    let pendingCount = 0;
+    let resolvedCount = 0;
+
     sessions.forEach((day, sessionIndex) => {
       let sessionWagered = 0;
       let sessionReturn = 0;
@@ -2021,23 +2025,32 @@ function calculateBankState() {
         const liability = (isLay && stake > 0 && odd > 1) ? (stake * (odd - 1)) : 0;
         const riskAmount = isLay ? liability : stake;
         const betProfit = parseFloat(bet.profit || 0);
+        const isPending = (bet.status === 'pending' || !bet.status);
 
         if (!bet.freebet) {
           dateWagered += riskAmount;
           sessionWagered += riskAmount;
         }
 
-        if (bet.status === 'green') {
-          if (isLay) {
-            dateReturn += bet.freebet ? betProfit : (liability + betProfit);
-            sessionReturn += bet.freebet ? betProfit : (liability + betProfit);
-          } else {
-            dateReturn += bet.freebet ? betProfit : (stake + betProfit);
-            sessionReturn += bet.freebet ? betProfit : (stake + betProfit);
+        if (isPending) {
+          pendingCount++;
+          if (!bet.freebet) {
+            pendingWagered += riskAmount;
           }
-        } else if (bet.status === 'refunded' && !bet.freebet) {
-          dateReturn += riskAmount;
-          sessionReturn += riskAmount;
+        } else {
+          resolvedCount++;
+          if (bet.status === 'green') {
+            if (isLay) {
+              dateReturn += bet.freebet ? betProfit : (liability + betProfit);
+              sessionReturn += bet.freebet ? betProfit : (liability + betProfit);
+            } else {
+              dateReturn += bet.freebet ? betProfit : (stake + betProfit);
+              sessionReturn += bet.freebet ? betProfit : (stake + betProfit);
+            }
+          } else if (bet.status === 'refunded' && !bet.freebet) {
+            dateReturn += riskAmount;
+            sessionReturn += riskAmount;
+          }
         }
 
         dateNetProfit += betProfit;
@@ -2059,14 +2072,37 @@ function calculateBankState() {
       totalDaysReturn += dateReturn;
 
       // IMPACTO NO BANCO:
-      // 1. Se Toggle ON (isDayActive === true): desconta o valor apostado (-dateWagered)
-      // 2. Se Toggle OFF (isDayActive === false) e a data for >= bankInitialDate: soma o lucro líquido (+dateNetProfit)
-      // 3. Dias anteriores a bankInitialDate com Toggle OFF já estão no Saldo Base do Banco (impacto = 0)
+      // 1. Se Toggle OFF (isDayActive === false) e < bankInitialDate: 0 (já incluso no Saldo Base do Banco)
+      // 2. Se Toggle OFF (isDayActive === false) e >= bankInitialDate: soma o lucro líquido (+dateNetProfit)
+      // 3. Se Toggle ON (isDayActive === true): cada aposta resolvida contribui com seu lucro/prejuízo (+betProfit),
+      //    e cada aposta em andamento desconta apenas a sua própria stake/responsabilidade (-riskAmount se não for freebet).
       let bankImpact = 0;
-      if (isDayActive) {
-        bankImpact = -dateWagered;
-      } else if (!bankInitialDate || dateKey >= bankInitialDate) {
+      if (bankInitialDate && dateKey < bankInitialDate && !isDayActive) {
+        bankImpact = 0;
+      } else if (!isDayActive) {
         bankImpact = dateNetProfit;
+      } else {
+        let totalImpact = 0;
+        sessions.forEach(day => {
+          (day.bets || []).forEach(bet => {
+            const stake = parseFloat(bet.stake || 0);
+            const odd = parseFloat(bet.odd || 0);
+            const isLay = bet.exchangeType === 'lay';
+            const liability = (isLay && stake > 0 && odd > 1) ? (stake * (odd - 1)) : 0;
+            const riskAmount = isLay ? liability : stake;
+            const betProfit = parseFloat(bet.profit || 0);
+            const isPending = (bet.status === 'pending' || !bet.status);
+
+            if (isPending) {
+              if (!bet.freebet) {
+                totalImpact -= riskAmount;
+              }
+            } else {
+              totalImpact += betProfit;
+            }
+          });
+        });
+        bankImpact = totalImpact;
       }
 
       if (hasBankBalance) {
@@ -2079,8 +2115,10 @@ function calculateBankState() {
         dateReturn,
         dateNetProfit,
         bankImpact,
-        // Para a interface, cada sessão cadastrada representa uma aposta do dia.
-        // Os registros dentro da sessão continuam sendo usados nos cálculos.
+        pendingWagered,
+        pendingCount,
+        resolvedCount,
+        hasPendingBets: pendingCount > 0,
         betsCount: sessions.length,
         isDayActive,
         bets: dateBets,
@@ -2728,16 +2766,39 @@ function renderHistory() {
     daySummaries.forEach(day => {
       let resultText = '';
       let amountClass = '';
-      
-      if (day.isDayActive) {
-        resultText = `-${formatCurrency(day.dateWagered)}`;
-        amountClass = 'text-amber-400 font-bold';
+
+      const hasPending = day.hasPendingBets && day.isDayActive;
+
+      if (day.bankImpact > 0) {
+        resultText = `+${formatCurrency(day.bankImpact)}`;
+        amountClass = 'text-emerald-400 font-bold';
+      } else if (day.bankImpact < 0) {
+        resultText = formatCurrency(day.bankImpact);
+        amountClass = hasPending ? 'text-amber-400 font-bold' : 'text-rose-400 font-bold';
       } else {
-        resultText = day.dateNetProfit >= 0 ? `+${formatCurrency(day.dateNetProfit)}` : formatCurrency(day.dateNetProfit);
-        amountClass = day.dateNetProfit > 0 ? 'text-emerald-400 font-bold' : (day.dateNetProfit < 0 ? 'text-rose-400 font-bold' : 'text-slate-400 font-bold');
+        resultText = formatCurrency(0);
+        amountClass = 'text-slate-400 font-bold';
       }
 
       const isExpanded = expandedHistoryDates.has(day.dateKey);
+
+      let statusBadgeHtml = '';
+      if (hasPending) {
+        if (day.pendingCount && day.pendingCount < day.betsCount) {
+          statusBadgeHtml = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 border border-amber-500/30 text-amber-400 font-bold">${day.pendingCount} de ${day.betsCount} EM ANDAMENTO</span>`;
+        } else {
+          statusBadgeHtml = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-bold">EM ANDAMENTO</span>`;
+        }
+      }
+
+      let returnText = '';
+      if (hasPending && day.resolvedCount === 0) {
+        returnText = 'Em andamento';
+      } else if (hasPending && day.resolvedCount > 0) {
+        returnText = `${formatCurrency(day.dateReturn)} <span class="text-[10px] text-amber-400 font-semibold">(parcial)</span>`;
+      } else {
+        returnText = formatCurrency(day.dateReturn);
+      }
 
       ledgerItems.push({
         id: 'day-' + day.dateKey,
@@ -2751,12 +2812,12 @@ function renderHistory() {
             <span class="flex items-center gap-1.5 font-semibold ${day.isDayActive ? 'text-emerald-400' : 'text-indigo-400'}">
               <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
               Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'})
-              ${day.isDayActive ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-bold">EM ANDAMENTO</span>' : ''}
+              ${statusBadgeHtml}
             </span>
           </div>
         `,
         wageredText: formatCurrency(day.dateWagered),
-        returnText: day.isDayActive ? 'Em andamento' : formatCurrency(day.dateReturn),
+        returnText: returnText,
         resultText: resultText,
         amountClass: amountClass,
         isDeletable: false,
