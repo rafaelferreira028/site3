@@ -2749,11 +2749,21 @@ function renderHistory() {
     historyList.forEach(tx => {
       const amountVal = parseFloat(tx.amount || 0);
       const isPositive = amountVal >= 0;
+      const icon = isPositive ? '🟢' : '🔴';
+      const descText = (tx.description && tx.description.trim())
+        ? tx.description.trim()
+        : (isPositive ? 'Depósito / Aporte no Banco' : 'Retirada do Banco');
+
       ledgerItems.push({
         id: tx.id,
         timestamp: tx.timestamp || new Date().toISOString(),
         category: 'manual',
-        typeLabel: isPositive ? '🟢 Depósito / Aporte no Banco' : '🔴 Retirada do Banco',
+        typeLabel: `
+          <div class="flex items-center gap-1.5 font-semibold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}">
+            <span class="text-xs shrink-0">${icon}</span>
+            <span class="truncate">${descText}</span>
+          </div>
+        `,
         wageredText: '-',
         returnText: '-',
         resultText: isPositive ? `+${formatCurrency(amountVal)}` : formatCurrency(amountVal),
