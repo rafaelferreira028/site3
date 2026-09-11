@@ -195,12 +195,6 @@
         </button>
 
         <!-- Botão Anotações do Saldo -->
-        <button id="btn-header-notes"
-          class="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 flex-1 md:flex-none"
-          title="Anotações e Diário de Saldo por Dia">
-          <i data-lucide="notebook-pen" class="w-4 h-4 text-indigo-400"></i>
-          Saldo
-        </button>
 
         <!-- Botão Backup/Importação -->
         <button id="btn-backup-restore-modal"
@@ -224,13 +218,16 @@
           Novo Dia de Apostas
         </button>
 
-        <!-- User Info Badge & Logout -->
-        <div id="user-badge" class="hidden md:flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300">
+        <!-- Perfil do Usuário -->
+        <button id="user-badge" type="button" class="hidden items-center gap-2 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 rounded-xl px-3 py-2 text-left text-xs text-slate-300 transition-colors flex-1 md:flex-none" title="Abrir perfil">
           <div class="p-1 bg-indigo-600/20 text-indigo-400 rounded-lg">
             <i data-lucide="user" class="w-3.5 h-3.5"></i>
           </div>
-          <span id="user-email-display" class="font-medium text-slate-200 max-w-[140px] truncate"></span>
-        </div>
+          <div class="min-w-0">
+            <span id="user-name-display" class="block font-bold text-slate-200 max-w-[150px] truncate">Meu perfil</span>
+            <span id="user-email-display" class="block text-[10px] text-slate-500 max-w-[150px] truncate"></span>
+          </div>
+        </button>
 
         <button id="btn-logout"
           class="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800/50 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 flex-1 md:flex-none"
@@ -685,6 +682,12 @@
               class="text-xs px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 font-medium">
               0 dias
             </span>
+            <button id="btn-open-pnl" type="button"
+              class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/60 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all duration-200"
+              title="Abrir calendário de lucro e prejuízo por dia">
+              <i data-lucide="calendar-days" class="w-4 h-4"></i>
+              <span>PnL</span>
+            </button>
             <button id="btn-export-summary-csv"
               class="flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-semibold text-xs transition-all duration-200 shadow-md shadow-emerald-600/20 active:scale-95"
               title="Baixar relatório em arquivo CSV (Excel/Planilhas)">
@@ -1282,6 +1285,118 @@
           Confirmar e Salvar
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Calendário PnL -->
+  <div id="modal-pnl" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-sm hidden" role="dialog" aria-modal="true" aria-labelledby="modal-pnl-title">
+    <div class="glass-panel w-full max-w-5xl max-h-[94vh] overflow-y-auto rounded-2xl border border-slate-800 shadow-2xl p-4 sm:p-6 animate-slide-down">
+      <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-900">
+        <div>
+          <h4 id="modal-pnl-title" class="text-lg sm:text-xl font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="chart-no-axes-combined" class="w-5 h-5 text-emerald-400"></i>
+            Calendário PnL
+          </h4>
+          <p id="pnl-range-label" class="text-xs text-slate-500 mt-1">Lucro e prejuízo líquido por dia</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-download-pnl" type="button" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold transition-colors" title="Baixar calendário em PNG">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            PNG
+          </button>
+          <button id="modal-pnl-close" type="button" class="text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors" aria-label="Fechar calendário PnL">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 py-4">
+        <button id="btn-pnl-prev-month" type="button" class="p-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:border-indigo-500/50" aria-label="Mês anterior"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+        <div class="text-center">
+          <p id="pnl-month-label" class="text-base sm:text-lg font-bold text-slate-100">Mês</p>
+          <p class="text-[11px] text-slate-500">Resultado líquido por dia</p>
+        </div>
+        <button id="btn-pnl-next-month" type="button" class="p-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:border-indigo-500/50" aria-label="Próximo mês"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="pnl-stat-card">
+          <span>Total PnL</span>
+          <strong id="pnl-total-value">R$ 0,00</strong>
+        </div>
+        <div class="pnl-stat-card">
+          <span>Dias lucrativos</span>
+          <strong id="pnl-profit-days-value">0 / R$ 0,00</strong>
+        </div>
+        <div class="pnl-stat-card">
+          <span>Dias de prejuízo</span>
+          <strong id="pnl-loss-days-value">0 / R$ 0,00</strong>
+        </div>
+      </div>
+      <div class="flex h-1.5 overflow-hidden rounded-full bg-slate-800 mt-3">
+        <span id="pnl-profit-bar" class="bg-emerald-500 transition-all duration-300" style="width: 0%"></span>
+        <span id="pnl-loss-bar" class="bg-rose-500 transition-all duration-300" style="width: 0%"></span>
+      </div>
+
+      <div class="mt-5">
+        <div class="pnl-calendar-weekdays" aria-hidden="true">
+          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+        </div>
+        <div id="pnl-calendar-grid" class="pnl-calendar-grid"></div>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-4">Dias sem apostas ficam em branco. Dias com resultado zerado aparecem como R$ 0,00.</p>
+    </div>
+  </div>
+
+  <!-- Modal: Perfil -->
+  <div id="modal-profile" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" role="dialog" aria-modal="true" aria-labelledby="modal-profile-title">
+    <div class="glass-panel w-full max-w-md rounded-2xl border border-slate-800 shadow-2xl p-5 sm:p-6 animate-slide-down">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-900">
+        <div>
+          <h4 id="modal-profile-title" class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="circle-user-round" class="w-5 h-5 text-indigo-400"></i>
+            Meu perfil
+          </h4>
+          <p class="text-xs text-slate-500 mt-1">Informações da sua conta</p>
+        </div>
+        <button id="modal-profile-close" type="button" class="text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors" aria-label="Fechar perfil">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="mt-5 p-4 rounded-xl bg-slate-950/60 border border-slate-800">
+        <p id="profile-name-display" class="text-sm font-bold text-slate-100 truncate">Usuário</p>
+        <p id="profile-email-display" class="text-xs text-slate-400 mt-1 truncate">email@exemplo.com</p>
+      </div>
+
+      <form id="form-profile-name" class="mt-4 flex gap-2">
+        <label class="min-w-0 flex-1">
+          <span class="block text-xs font-semibold text-slate-300 mb-1.5">Nome de exibição</span>
+          <input id="profile-name-input" type="text" maxlength="80" autocomplete="name" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm" placeholder="Como deseja ser chamado">
+        </label>
+        <button id="btn-save-profile-name" type="submit" class="self-end bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors">Salvar</button>
+      </form>
+
+      <form id="form-change-password" class="mt-5 space-y-4">
+        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+          <i data-lucide="lock-keyhole" class="w-4 h-4 text-indigo-400"></i>
+          Alterar senha
+        </div>
+        <div>
+          <label for="profile-current-password" class="block text-xs font-semibold text-slate-300 mb-1.5">Senha atual</label>
+          <input id="profile-current-password" type="password" autocomplete="current-password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm" placeholder="Digite sua senha atual">
+        </div>
+        <div>
+          <label for="profile-new-password" class="block text-xs font-semibold text-slate-300 mb-1.5">Nova senha</label>
+          <input id="profile-new-password" type="password" autocomplete="new-password" required minlength="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm" placeholder="Mínimo de 6 caracteres">
+        </div>
+        <div>
+          <label for="profile-confirm-password" class="block text-xs font-semibold text-slate-300 mb-1.5">Confirmar nova senha</label>
+          <input id="profile-confirm-password" type="password" autocomplete="new-password" required minlength="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm" placeholder="Repita a nova senha">
+        </div>
+        <p id="profile-password-alert" class="hidden text-xs rounded-xl border px-3 py-2.5"></p>
+        <button id="btn-change-password" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors">Salvar nova senha</button>
+      </form>
     </div>
   </div>
 

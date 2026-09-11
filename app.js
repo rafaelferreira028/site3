@@ -925,6 +925,11 @@ function updateGlobalStats() {
     renderGoals();
   }
 
+  const pnlModal = document.getElementById('modal-pnl');
+  if (pnlModal && !pnlModal.classList.contains('hidden')) {
+    renderPnlCalendar();
+  }
+
   // Update global capital totals
   updateGlobalCapital();
 }
@@ -1916,6 +1921,12 @@ window.addEventListener('click', (e) => {
   if (e.target === modalBackupRestore) {
     closeBackupRestoreModal();
   }
+  if (e.target === document.getElementById('modal-profile')) {
+    closeProfileModal();
+  }
+  if (e.target === document.getElementById('modal-pnl')) {
+    closePnlModal();
+  }
   if (e.target === document.getElementById('modal-confirm')) {
     hideConfirm();
   }
@@ -1937,6 +1948,8 @@ window.addEventListener('keydown', (e) => {
     closeEditDayModal();
     closeAddBalanceModal();
     closeBackupRestoreModal();
+    closeProfileModal();
+    closePnlModal();
     hideConfirm();
     closeMobileMenu();
   }
@@ -3913,6 +3926,262 @@ function printBetsSummaryReport() {
   printWindow.document.close();
 }
 
+// ==========================================
+// PNL CALENDAR
+// ==========================================
+
+let pnlCalendarMonth = '';
+let pnlCalendarRange = { start: '', end: '' };
+
+function getPnlMonthBounds(monthValue) {
+  const [year, month] = (monthValue || '').split('-').map(Number);
+  const safeYear = year || new Date().getFullYear();
+  const safeMonth = month || (new Date().getMonth() + 1);
+  const lastDay = new Date(safeYear, safeMonth, 0).getDate();
+  return {
+    year: safeYear,
+    month: safeMonth,
+    start: `${safeYear}-${String(safeMonth).padStart(2, '0')}-01`,
+    end: `${safeYear}-${String(safeMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    daysInMonth: lastDay,
+    firstWeekday: new Date(safeYear, safeMonth - 1, 1).getDay()
+  };
+}
+
+function getPnlCalendarData() {
+  const bounds = getPnlMonthBounds(pnlCalendarMonth);
+  const daily = {};
+  const rangeStart = pnlCalendarRange.start || bounds.start;
+  const rangeEnd = pnlCalendarRange.end || bounds.end;
+
+  (trackerData.days || []).forEach(session => {
+    const date = session.date || '';
+    if (date < bounds.start || date > bounds.end || date < rangeStart || date > rangeEnd) return;
+    if (!daily[date]) daily[date] = { profit: 0, hasEntries: false };
+    daily[date].hasEntries = true;
+    (session.bets || []).forEach(bet => {
+      daily[date].profit += parseFloat(bet.profit) || 0;
+    });
+  });
+
+  let totalProfit = 0;
+  let profitableDays = 0;
+  let lossDays = 0;
+  let profitAmount = 0;
+  let lossAmount = 0;
+  Object.values(daily).forEach(day => {
+    totalProfit += day.profit;
+    if (day.profit > 0) {
+      profitableDays++;
+      profitAmount += day.profit;
+    } else if (day.profit < 0) {
+      lossDays++;
+      lossAmount += Math.abs(day.profit);
+    }
+  });
+
+  return { bounds, daily, totalProfit, profitableDays, lossDays, profitAmount, lossAmount, rangeStart, rangeEnd };
+}
+
+function formatPnlDateRange(start, end) {
+  if (!start && !end) return 'Todo o mês selecionado';
+  if (start && end) return `Período: ${formatDayMonth(start)} até ${formatDayMonth(end)}`;
+  return start ? `A partir de ${formatDayMonth(start)}` : `Até ${formatDayMonth(end)}`;
+}
+
+function renderPnlCalendar() {
+  const grid = document.getElementById('pnl-calendar-grid');
+  if (!grid) return;
+  const data = getPnlCalendarData();
+  const { bounds, daily, totalProfit, profitableDays, lossDays, profitAmount, lossAmount, rangeStart, rangeEnd } = data;
+  const monthDate = new Date(bounds.year, bounds.month - 1, 1);
+  const monthLabel = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const label = document.getElementById('pnl-month-label');
+  const rangeLabel = document.getElementById('pnl-range-label');
+  const totalEl = document.getElementById('pnl-total-value');
+  const profitDaysEl = document.getElementById('pnl-profit-days-value');
+  const lossDaysEl = document.getElementById('pnl-loss-days-value');
+  const profitBar = document.getElementById('pnl-profit-bar');
+  const lossBar = document.getElementById('pnl-loss-bar');
+
+  if (label) label.textContent = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+  if (rangeLabel) rangeLabel.textContent = formatPnlDateRange(pnlCalendarRange.start, pnlCalendarRange.end);
+  if (totalEl) {
+    totalEl.textContent = `${totalProfit > 0 ? '+' : ''}${formatCurrency(totalProfit)}`;
+    totalEl.className = `block mt-1.5 text-xl font-extrabold ${totalProfit > 0 ? 'text-emerald-400' : (totalProfit < 0 ? 'text-rose-400' : 'text-slate-200')}`;
+  }
+  if (profitDaysEl) {
+    profitDaysEl.textContent = `${profitableDays} / +${formatCurrency(profitAmount)}`;
+    profitDaysEl.className = 'block mt-1.5 text-xl font-extrabold text-emerald-400';
+  }
+  if (lossDaysEl) {
+    lossDaysEl.textContent = `${lossDays} / -${formatCurrency(lossAmount)}`;
+    lossDaysEl.className = 'block mt-1.5 text-xl font-extrabold text-rose-400';
+  }
+
+  const totalMovement = profitAmount + lossAmount;
+  if (profitBar) profitBar.style.width = `${totalMovement ? (profitAmount / totalMovement) * 100 : 0}%`;
+  if (lossBar) lossBar.style.width = `${totalMovement ? (lossAmount / totalMovement) * 100 : 0}%`;
+
+  let cells = '';
+  for (let i = 0; i < bounds.firstWeekday; i++) {
+    cells += '<div class="pnl-day-cell is-empty" aria-hidden="true"></div>';
+  }
+  for (let dayNumber = 1; dayNumber <= bounds.daysInMonth; dayNumber++) {
+    const dateKey = `${bounds.year}-${String(bounds.month).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+    const dayData = daily[dateKey];
+    const isInRange = dateKey >= rangeStart && dateKey <= rangeEnd;
+    const profit = dayData?.profit || 0;
+    const stateClass = !dayData || !isInRange ? '' : (profit > 0 ? 'has-profit' : (profit < 0 ? 'has-loss' : 'has-neutral'));
+    const value = dayData && isInRange ? `${profit > 0 ? '+' : ''}${formatCurrency(profit)}` : '';
+    cells += `<div class="pnl-day-cell ${stateClass}"><span class="pnl-day-number">${dayNumber}</span><span class="pnl-day-value">${value}</span></div>`;
+  }
+  const usedCells = bounds.firstWeekday + bounds.daysInMonth;
+  const trailingCells = (7 - (usedCells % 7)) % 7;
+  for (let i = 0; i < trailingCells; i++) {
+    cells += '<div class="pnl-day-cell is-empty" aria-hidden="true"></div>';
+  }
+  grid.innerHTML = cells;
+}
+
+function openPnlModal() {
+  const modal = document.getElementById('modal-pnl');
+  if (!modal) return;
+  const summaryStart = summaryDateStartInput?.value || '';
+  const summaryEnd = summaryDateEndInput?.value || '';
+  const latestDate = [...(trackerData.days || [])].map(day => day.date).filter(Boolean).sort().pop();
+  const sourceDate = summaryStart || summaryEnd || latestDate || formatLocalDateInput(new Date());
+  pnlCalendarMonth = sourceDate.slice(0, 7);
+  pnlCalendarRange = { start: summaryStart, end: summaryEnd };
+  modal.classList.remove('hidden');
+  renderPnlCalendar();
+  if (window.lucide) window.lucide.createIcons({ root: modal });
+}
+
+function closePnlModal() {
+  const modal = document.getElementById('modal-pnl');
+  if (modal) modal.classList.add('hidden');
+}
+
+function changePnlMonth(offset) {
+  const bounds = getPnlMonthBounds(pnlCalendarMonth);
+  const next = new Date(bounds.year, bounds.month - 1 + offset, 1);
+  pnlCalendarMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+  // Navigating to another month means the complete month becomes the period.
+  pnlCalendarRange = { start: '', end: '' };
+  renderPnlCalendar();
+}
+
+function roundRect(context, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
+}
+
+function downloadPnlAsPng() {
+  const data = getPnlCalendarData();
+  const { bounds, daily, totalProfit, profitableDays, lossDays, profitAmount, lossAmount, rangeStart, rangeEnd } = data;
+  const calendarRows = Math.ceil((bounds.firstWeekday + bounds.daysInMonth) / 7);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 650 + (calendarRows * 160);
+  const context = canvas.getContext('2d');
+  const monthLabel = new Date(bounds.year, bounds.month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const titleMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+
+  context.fillStyle = '#030712';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#f8fafc';
+  context.font = '800 46px Arial';
+  context.fillText('Calendário PnL', 70, 82);
+  context.fillStyle = '#94a3b8';
+  context.font = '500 24px Arial';
+  context.fillText(`${titleMonth} • ${formatPnlDateRange(pnlCalendarRange.start, pnlCalendarRange.end)}`, 70, 120);
+
+  const stats = [
+    ['Total PnL', `${totalProfit > 0 ? '+' : ''}${formatCurrency(totalProfit)}`, totalProfit > 0 ? '#34d399' : (totalProfit < 0 ? '#fb7185' : '#e2e8f0')],
+    ['Dias lucrativos', `${profitableDays} / +${formatCurrency(profitAmount)}`, '#34d399'],
+    ['Dias de prejuízo', `${lossDays} / -${formatCurrency(lossAmount)}`, '#fb7185']
+  ];
+  stats.forEach((stat, index) => {
+    const x = 70 + (index * 425);
+    roundRect(context, x, 160, 390, 125, 22);
+    context.fillStyle = '#0f172a';
+    context.fill();
+    context.fillStyle = '#94a3b8';
+    context.font = '700 17px Arial';
+    context.fillText(stat[0].toUpperCase(), x + 25, 200);
+    context.fillStyle = stat[2];
+    context.font = '800 31px Arial';
+    context.fillText(stat[1], x + 25, 247);
+  });
+
+  const gridX = 70;
+  const gridY = 360;
+  const gap = 14;
+  const cellWidth = (1260 - (gap * 6)) / 7;
+  const cellHeight = 128;
+  ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].forEach((name, index) => {
+    context.fillStyle = '#94a3b8';
+    context.font = '700 18px Arial';
+    context.textAlign = 'center';
+    context.fillText(name, gridX + (index * (cellWidth + gap)) + (cellWidth / 2), gridY - 20);
+  });
+
+  for (let dayNumber = 1; dayNumber <= bounds.daysInMonth; dayNumber++) {
+    const dateKey = `${bounds.year}-${String(bounds.month).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+    const index = bounds.firstWeekday + dayNumber - 1;
+    const col = index % 7;
+    const row = Math.floor(index / 7);
+    const x = gridX + (col * (cellWidth + gap));
+    const y = gridY + (row * (cellHeight + gap));
+    const dayData = daily[dateKey];
+    const inRange = dateKey >= rangeStart && dateKey <= rangeEnd;
+    const profit = dayData?.profit || 0;
+    context.fillStyle = dayData && inRange ? (profit > 0 ? '#064e3b' : (profit < 0 ? '#881337' : '#1e293b')) : '#0f172a';
+    roundRect(context, x, y, cellWidth, cellHeight, 16);
+    context.fill();
+    context.fillStyle = '#e2e8f0';
+    context.textAlign = 'left';
+    context.font = '800 24px Arial';
+    context.fillText(String(dayNumber), x + 18, y + 34);
+    if (dayData && inRange) {
+      context.fillStyle = profit > 0 ? '#6ee7b7' : (profit < 0 ? '#fda4af' : '#94a3b8');
+      context.font = '800 20px Arial';
+      context.fillText(`${profit > 0 ? '+' : ''}${formatCurrency(profit)}`, x + 18, y + 95);
+    }
+  }
+
+  canvas.toBlob(blob => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pnl-calendario-${pnlCalendarMonth}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+const btnOpenPnl = document.getElementById('btn-open-pnl');
+const btnClosePnl = document.getElementById('modal-pnl-close');
+const btnPnlPreviousMonth = document.getElementById('btn-pnl-prev-month');
+const btnPnlNextMonth = document.getElementById('btn-pnl-next-month');
+const btnDownloadPnl = document.getElementById('btn-download-pnl');
+if (btnOpenPnl) btnOpenPnl.addEventListener('click', openPnlModal);
+if (btnClosePnl) btnClosePnl.addEventListener('click', closePnlModal);
+if (btnPnlPreviousMonth) btnPnlPreviousMonth.addEventListener('click', () => changePnlMonth(-1));
+if (btnPnlNextMonth) btnPnlNextMonth.addEventListener('click', () => changePnlMonth(1));
+if (btnDownloadPnl) btnDownloadPnl.addEventListener('click', downloadPnlAsPng);
+
 // Tab Switching Listener & Hash Routing
 const tabDashboard = document.getElementById('tab-dashboard');
 const tabBetsSummary = document.getElementById('tab-bets-summary');
@@ -3921,7 +4190,6 @@ const tabHistory = document.getElementById('tab-history');
 const tabNotes = document.getElementById('tab-notes');
 const tabFreebets = document.getElementById('tab-freebets');
 const tabGoals = document.getElementById('tab-goals');
-const btnHeaderNotes = document.getElementById('btn-header-notes');
 const btnFreebetHeaderCount = document.getElementById('freebet-count');
 
 const contentDashboard = document.getElementById('content-dashboard');
@@ -4046,7 +4314,6 @@ if (tabGoals) tabGoals.addEventListener('click', activateGoalsTab);
 const btnSaveGoal = document.getElementById('btn-save-goal');
 if (btnSaveGoal) btnSaveGoal.addEventListener('click', saveGoal);
 
-if (btnHeaderNotes) btnHeaderNotes.addEventListener('click', activateNotesTab);
 if (btnFreebetHeaderCount) btnFreebetHeaderCount.addEventListener('click', activateFreebetsTab);
 
 if (inputSearchFreebetDays) {
@@ -5613,6 +5880,150 @@ function toggleMobileMenu() {
 let currentSession = null;
 let currentAuthMode = 'login'; // 'login' ou 'register'
 
+function getProfileName(user) {
+  const metadata = user?.user_metadata || {};
+  const name = metadata.full_name || metadata.name || metadata.display_name;
+  if (name && String(name).trim()) return String(name).trim();
+  const email = user?.email || '';
+  return email ? email.split('@')[0] : 'Usuário';
+}
+
+function populateProfile(user = currentSession?.user) {
+  const name = getProfileName(user);
+  const email = user?.email || '';
+  const headerName = document.getElementById('user-name-display');
+  const headerEmail = document.getElementById('user-email-display');
+  const profileName = document.getElementById('profile-name-display');
+  const profileEmail = document.getElementById('profile-email-display');
+  const profileNameInput = document.getElementById('profile-name-input');
+
+  if (headerName) headerName.textContent = name;
+  if (headerEmail) headerEmail.textContent = email;
+  if (profileName) profileName.textContent = name;
+  if (profileEmail) profileEmail.textContent = email;
+  if (profileNameInput && document.activeElement !== profileNameInput) profileNameInput.value = name;
+}
+
+function showProfilePasswordAlert(message, type = 'error') {
+  const alert = document.getElementById('profile-password-alert');
+  if (!alert) return;
+  alert.textContent = message;
+  alert.className = `text-xs rounded-xl border px-3 py-2.5 ${type === 'success'
+    ? 'bg-emerald-950/50 border-emerald-500/30 text-emerald-300'
+    : 'bg-rose-950/50 border-rose-500/30 text-rose-300'}`;
+}
+
+function openProfileModal() {
+  const modal = document.getElementById('modal-profile');
+  if (!modal) return;
+  closeMobileMenu();
+  populateProfile();
+  const form = document.getElementById('form-change-password');
+  if (form) form.reset();
+  const alert = document.getElementById('profile-password-alert');
+  if (alert) alert.classList.add('hidden');
+  modal.classList.remove('hidden');
+  if (window.lucide) window.lucide.createIcons({ root: modal });
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById('modal-profile');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleProfileNameUpdate(event) {
+  event.preventDefault();
+  const input = document.getElementById('profile-name-input');
+  const button = document.getElementById('btn-save-profile-name');
+  const name = input?.value.trim() || '';
+  if (!name) {
+    if (input) input.focus();
+    return;
+  }
+  if (!supabaseClient || !currentSession?.user) return;
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+  }
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      data: { ...(currentSession.user.user_metadata || {}), full_name: name }
+    });
+    if (error) throw error;
+    if (data?.user && currentSession) {
+      currentSession = { ...currentSession, user: data.user };
+      populateProfile(data.user);
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar perfil:', error);
+    showProfilePasswordAlert(translateAuthError(error));
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Salvar';
+    }
+  }
+}
+
+async function handleChangePassword(event) {
+  event.preventDefault();
+  const currentInput = document.getElementById('profile-current-password');
+  const newInput = document.getElementById('profile-new-password');
+  const confirmInput = document.getElementById('profile-confirm-password');
+  const submitButton = document.getElementById('btn-change-password');
+  const currentPassword = currentInput?.value || '';
+  const newPassword = newInput?.value || '';
+  const confirmation = confirmInput?.value || '';
+
+  if (!currentPassword || !newPassword || !confirmation) {
+    showProfilePasswordAlert('Preencha todos os campos de senha.');
+    return;
+  }
+  if (newPassword.length < 6) {
+    showProfilePasswordAlert('A nova senha precisa ter no mínimo 6 caracteres.');
+    return;
+  }
+  if (newPassword !== confirmation) {
+    showProfilePasswordAlert('A confirmação não coincide com a nova senha.');
+    return;
+  }
+  if (!supabaseClient || !currentSession?.user) {
+    showProfilePasswordAlert('Sua sessão não está disponível. Entre novamente para alterar a senha.');
+    return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Salvando...';
+  }
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      password: newPassword,
+      current_password: currentPassword
+    });
+    if (error) throw error;
+
+    if (data?.user && currentSession) {
+      currentSession = { ...currentSession, user: data.user };
+      populateProfile(data.user);
+    }
+    if (currentInput) currentInput.value = '';
+    if (newInput) newInput.value = '';
+    if (confirmInput) confirmInput.value = '';
+    showProfilePasswordAlert('Senha alterada com sucesso.', 'success');
+  } catch (error) {
+    console.error('Erro ao alterar senha:', error);
+    showProfilePasswordAlert(translateAuthError(error));
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Salvar nova senha';
+    }
+  }
+}
+
 function switchAuthMode(mode) {
   currentAuthMode = mode;
 
@@ -5724,6 +6135,9 @@ function translateAuthError(error) {
   if (msg.includes('Password should be at least 6 characters')) {
     return 'A senha precisa ter no mínimo 6 caracteres.';
   }
+  if (msg.toLowerCase().includes('invalid password') || msg.toLowerCase().includes('current password')) {
+    return 'A senha atual está incorreta.';
+  }
   if (msg.includes('Unable to validate email address') || msg.includes('invalid format') || msg.includes('invalid email')) {
     return 'Por favor, insira um endereço de e-mail válido.';
   }
@@ -5822,15 +6236,17 @@ async function updateAppForSession(session) {
   const authContainer = document.getElementById('auth-container');
   const appContainer = document.getElementById('app-container');
   const userBadge = document.getElementById('user-badge');
-  const userEmailDisplay = document.getElementById('user-email-display');
 
   if (session && session.user) {
     // Exibe a aplicação e esconde o login
     if (authContainer) authContainer.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
 
-    if (userEmailDisplay) userEmailDisplay.textContent = session.user.email || 'Usuário';
-    if (userBadge) userBadge.classList.remove('hidden');
+    populateProfile(session.user);
+    if (userBadge) {
+      userBadge.classList.remove('hidden');
+      userBadge.classList.add('flex');
+    }
 
     if (window.lucide) window.lucide.createIcons();
 
@@ -5850,7 +6266,10 @@ async function updateAppForSession(session) {
     appLoaded = false;
     if (appContainer) appContainer.classList.add('hidden');
     if (authContainer) authContainer.classList.remove('hidden');
-    if (userBadge) userBadge.classList.add('hidden');
+    if (userBadge) {
+      userBadge.classList.add('hidden');
+      userBadge.classList.remove('flex');
+    }
 
     if (window.lucide) window.lucide.createIcons();
   }
@@ -5863,6 +6282,10 @@ async function initAuthFlow() {
   const btnToggleMode = document.getElementById('btn-auth-toggle-mode');
   const btnTogglePassword = document.getElementById('btn-toggle-password');
   const btnLogout = document.getElementById('btn-logout');
+  const btnOpenProfile = document.getElementById('user-badge');
+  const btnCloseProfile = document.getElementById('modal-profile-close');
+  const profileNameForm = document.getElementById('form-profile-name');
+  const changePasswordForm = document.getElementById('form-change-password');
 
   if (tabLogin) tabLogin.addEventListener('click', () => switchAuthMode('login'));
   if (tabRegister) tabRegister.addEventListener('click', () => switchAuthMode('register'));
@@ -5890,6 +6313,10 @@ async function initAuthFlow() {
   if (btnLogout) {
     btnLogout.addEventListener('click', handleLogout);
   }
+  if (btnOpenProfile) btnOpenProfile.addEventListener('click', openProfileModal);
+  if (btnCloseProfile) btnCloseProfile.addEventListener('click', closeProfileModal);
+  if (profileNameForm) profileNameForm.addEventListener('submit', handleProfileNameUpdate);
+  if (changePasswordForm) changePasswordForm.addEventListener('submit', handleChangePassword);
 
   // Verificar sessão atual
   if (!supabaseClient) {

@@ -79,6 +79,100 @@ body {
   animation: slideDown 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* PnL calendar */
+.pnl-stat-card {
+  min-height: 82px;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  border-radius: 0.9rem;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.pnl-stat-card span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pnl-stat-card strong {
+  display: block;
+  margin-top: 0.4rem;
+  color: #e2e8f0;
+  font-size: 1.15rem;
+}
+
+.pnl-calendar-weekdays,
+.pnl-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.pnl-calendar-weekdays {
+  margin-bottom: 0.4rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.pnl-day-cell {
+  display: flex;
+  min-height: 76px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.55rem;
+  border: 1px solid rgba(30, 41, 59, 0.7);
+  border-radius: 0.65rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.pnl-day-cell.is-empty {
+  border-color: transparent;
+  background: transparent;
+}
+
+.pnl-day-cell.has-profit {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: rgba(6, 78, 59, 0.42);
+}
+
+.pnl-day-cell.has-loss {
+  border-color: rgba(244, 63, 94, 0.32);
+  background: rgba(136, 19, 55, 0.38);
+}
+
+.pnl-day-number {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pnl-day-value {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.has-profit .pnl-day-value { color: #6ee7b7; }
+.has-loss .pnl-day-value { color: #fda4af; }
+.has-neutral .pnl-day-value { color: #94a3b8; }
+
+@media (min-width: 640px) {
+  .pnl-day-cell {
+    min-height: 100px;
+    padding: 0.75rem;
+  }
+
+  .pnl-day-number { font-size: 0.85rem; }
+  .pnl-day-value { font-size: 0.85rem; }
+}
+
 /* Dashboard: sessões ficam agrupadas e compactas dentro de cada dia. */
 .dashboard-date-group .dashboard-session {
   background: rgba(15, 23, 42, 0.42);
