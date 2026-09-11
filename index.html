@@ -278,6 +278,11 @@
         <i data-lucide="gift" class="w-4 h-4"></i>
         Dias com Freebets
       </button>
+      <button id="tab-goals"
+        class="px-4 md:px-5 py-3 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors flex items-center gap-2 shrink-0">
+        <i data-lucide="target" class="w-4 h-4 text-emerald-400"></i>
+        Metas
+      </button>
     </div>
 
 
@@ -414,6 +419,7 @@
           </div>
 
         </div>
+        <div id="dashboard-pagination" class="mt-5"></div>
       </section>
     </div>
 
@@ -583,6 +589,7 @@
             <p class="text-xs text-slate-500 mt-1">Deposite um valor inicial ou crie um dia de apostas para ver os lançamentos.</p>
           </div>
         </div>
+        <div id="history-pagination" class="mt-5"></div>
       </div>
     </div>
 
@@ -718,6 +725,7 @@
             <p class="text-sm font-medium">Nenhum dia de apostas registrado para exibir resumo.</p>
           </div>
         </div>
+        <div id="summary-pagination" class="mt-5"></div>
       </div>
 
     </div>
@@ -967,6 +975,58 @@
             <strong class="text-indigo-400">Freebet</strong> em pelo menos uma das apostas cadastradas.</p>
         </div>
       </div>
+    </div>
+
+    <!-- Conteúdo: Metas -->
+    <div id="content-goals" class="space-y-6 hidden">
+      <section class="glass-card rounded-2xl border border-slate-800 p-5 md:p-6 shadow-lg">
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+          <div>
+            <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <i data-lucide="target" class="w-5 h-5 text-emerald-400"></i>
+              Meta de lucro
+            </h3>
+            <p class="text-xs text-slate-450 mt-1">Defina um valor e a data inicial. O resultado líquido das apostas feitas a partir dessa data atualiza a meta automaticamente.</p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <label class="block text-xs font-semibold text-slate-300">
+              Valor da meta
+              <div class="relative mt-1.5">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">R$</span>
+                <input id="goal-target-amount" type="number" min="0" step="0.01" placeholder="Ex.: 1000,00" class="w-full sm:w-44 bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold">
+              </div>
+            </label>
+            <label class="block text-xs font-semibold text-slate-300">
+              Contar a partir de
+              <input id="goal-start-date" type="date" class="block w-full sm:w-44 mt-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm font-semibold">
+            </label>
+            <button id="btn-save-goal" type="button" class="self-end bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-emerald-600/20">Salvar meta</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-card rounded-2xl border border-slate-800 p-5 md:p-7 shadow-lg overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold tracking-wider uppercase text-emerald-400">Progresso da meta</p>
+            <div class="mt-2 flex items-baseline gap-2 flex-wrap">
+              <span id="goal-current-value" class="text-3xl md:text-4xl font-extrabold text-slate-100">R$ 0,00</span>
+              <span id="goal-target-value" class="text-sm font-semibold text-slate-500">de R$ 0,00</span>
+            </div>
+          </div>
+          <div class="text-left sm:text-right">
+            <span id="goal-percent" class="text-2xl font-extrabold text-emerald-400">0%</span>
+            <p id="goal-status-text" class="text-xs text-slate-450 mt-1">Defina sua meta para começar.</p>
+          </div>
+        </div>
+        <div class="mt-6 h-5 w-full rounded-full bg-slate-950 border border-slate-800 overflow-hidden shadow-inner" role="progressbar" aria-label="Progresso da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="goal-progress-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-400 transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <div class="mt-3 flex justify-between gap-4 text-xs text-slate-500">
+          <span>Início: <strong id="goal-start-date-label" class="text-slate-300">não definido</strong></span>
+          <span id="goal-remaining-value">Faltam R$ 0,00</span>
+        </div>
+      </section>
     </div>
 
 

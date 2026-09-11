@@ -14,6 +14,24 @@ let trackerData = { days: [], dailyNotes: [] };
 let globalBalance = 0;
 let balanceHistory = [];
 
+// Each heavy list only mounts ten calendar days at a time. This keeps the
+// dashboard responsive even when the tracker has a long history.
+const DAYS_PER_PAGE = 10;
+let dashboardPage = 1;
+let historyPage = 1;
+let summaryPage = 1;
+
+function ensureTrackerDataShape() {
+  if (!trackerData || typeof trackerData !== 'object') trackerData = {};
+  if (!Array.isArray(trackerData.days)) trackerData.days = [];
+  if (!Array.isArray(trackerData.dailyNotes)) trackerData.dailyNotes = [];
+  if (!trackerData.goal || typeof trackerData.goal !== 'object') {
+    trackerData.goal = { amount: 0, startDate: '' };
+  }
+  trackerData.goal.amount = Math.max(0, parseFloat(trackerData.goal.amount) || 0);
+  trackerData.goal.startDate = trackerData.goal.startDate || '';
+}
+
 // Status indicator updater
 function showSyncIndicator(state, message) {
   const statusContainer = document.getElementById('sync-status');
@@ -39,8 +57,7 @@ function loadLocalFallback() {
   try {
     const stored = localStorage.getItem('sports_betting_tracker_data');
     if (stored) trackerData = JSON.parse(stored);
-    if (!trackerData.days) trackerData.days = [];
-    if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+    ensureTrackerDataShape();
 
 
 
@@ -50,7 +67,7 @@ function loadLocalFallback() {
     if (histStored) balanceHistory = JSON.parse(histStored);
     if (!Array.isArray(balanceHistory)) balanceHistory = [];
   } catch (e) {
-    trackerData = { days: [], dailyNotes: [] };
+    trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
     globalBalance = 0;
     balanceHistory = [];
   }
@@ -117,10 +134,9 @@ async function loadData() {
       if (row.tracker_data) {
         trackerData = typeof row.tracker_data === 'string' ? JSON.parse(row.tracker_data) : row.tracker_data;
       } else {
-        trackerData = { days: [], dailyNotes: [] };
+        trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
       }
-      if (!trackerData.days) trackerData.days = [];
-      if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+      ensureTrackerDataShape();
 
       if (row.global_balance !== undefined && row.global_balance !== null) {
         globalBalance = parseFloat(row.global_balance) || 0;
@@ -135,7 +151,7 @@ async function loadData() {
       showSyncIndicator('synced', 'Supabase Conectado');
     } else {
       console.log(`Nenhum registro encontrado em app_state para user_id=${user.id}. Criando novo estado...`);
-      trackerData = { days: [], dailyNotes: [] };
+      trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
       globalBalance = 0;
       balanceHistory = [];
       saveLocalFallback();
@@ -262,8 +278,7 @@ async function handleRealtimeUpdate(payload) {
 
   if (remoteTracker && JSON.stringify(remoteTracker) !== JSON.stringify(trackerData)) {
     trackerData = remoteTracker;
-    if (!trackerData.days) trackerData.days = [];
-    if (!trackerData.dailyNotes) trackerData.dailyNotes = [];
+    ensureTrackerDataShape();
     updated = true;
   }
 
@@ -328,6 +343,41 @@ function formatCurrency(value) {
   }).format(value);
 }
 
+function clampPage(page, totalItems) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / DAYS_PER_PAGE));
+  return Math.min(Math.max(1, page), totalPages);
+}
+
+function renderPagination(containerId, page, totalItems, onPageChange) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / DAYS_PER_PAGE));
+  if (totalItems <= DAYS_PER_PAGE) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const firstItem = ((page - 1) * DAYS_PER_PAGE) + 1;
+  const lastItem = Math.min(page * DAYS_PER_PAGE, totalItems);
+  container.innerHTML = `
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800 pt-4">
+      <span class="text-xs text-slate-500">Mostrando ${firstItem}–${lastItem} de ${totalItems} dias</span>
+      <div class="flex items-center gap-2">
+        <button type="button" data-page-action="prev" ${page === 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-indigo-500/50">Anterior</button>
+        <span class="text-xs font-bold text-indigo-400 px-2">Página ${page} de ${totalPages}</span>
+        <button type="button" data-page-action="next" ${page === totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-indigo-500/50">Próxima</button>
+      </div>
+    </div>
+  `;
+
+  container.onclick = (event) => {
+    const action = event.target.closest('[data-page-action]')?.dataset.pageAction;
+    if (action === 'prev' && page > 1) onPageChange(page - 1);
+    if (action === 'next' && page < totalPages) onPageChange(page + 1);
+  };
+}
+
 // ==========================================
 // CALCULATION LOGIC
 // ==========================================
@@ -340,8 +390,26 @@ function getGreenFactor(bet) {
   return 1;
 }
 
+let deferredStatsRefresh = null;
+
+function refreshDependentViews() {
+  updateGlobalStats();
+  const historyContent = document.getElementById('content-history');
+  const summaryContent = document.getElementById('content-bets-summary');
+  if (historyContent && !historyContent.classList.contains('hidden')) renderHistory();
+  if (summaryContent && !summaryContent.classList.contains('hidden')) renderBetsSummary();
+}
+
+function scheduleDependentViewsRefresh() {
+  if (deferredStatsRefresh) clearTimeout(deferredStatsRefresh);
+  deferredStatsRefresh = setTimeout(() => {
+    deferredStatsRefresh = null;
+    refreshDependentViews();
+  }, 160);
+}
+
 // Update calculations for a specific bet row DOM element and save values
-function updateBetCalculations(dayId, betId, rowElement) {
+function updateBetCalculations(dayId, betId, rowElement, deferHeavyRefresh = false) {
   const day = trackerData.days.find(d => d.id === dayId);
   if (!day) return;
   const bet = day.bets.find(b => b.id === betId);
@@ -418,8 +486,11 @@ function updateBetCalculations(dayId, betId, rowElement) {
 
   // Update day header totals and global summary
   updateDaySummary(dayId);
-  updateGlobalStats();
-  renderHistory();
+  if (deferHeavyRefresh) {
+    scheduleDependentViewsRefresh();
+  } else {
+    refreshDependentViews();
+  }
 
   // Save to persistent storage
   debouncedSaveData();
@@ -849,8 +920,97 @@ function updateGlobalStats() {
     renderFreebetDays(inputSearchFreebetDays ? inputSearchFreebetDays.value : '');
   }
 
+  const contentGoalsEl = document.getElementById('content-goals');
+  if (contentGoalsEl && !contentGoalsEl.classList.contains('hidden')) {
+    renderGoals();
+  }
+
   // Update global capital totals
   updateGlobalCapital();
+}
+
+// ==========================================
+// GOAL TRACKING
+// ==========================================
+
+function getGoalProgress() {
+  ensureTrackerDataShape();
+  const { amount, startDate } = trackerData.goal;
+  let profit = 0;
+
+  if (startDate) {
+    (trackerData.days || []).forEach(day => {
+      if ((day.date || '') < startDate) return;
+      (day.bets || []).forEach(bet => {
+        profit += parseFloat(bet.profit) || 0;
+      });
+    });
+  }
+
+  return { amount, startDate, profit };
+}
+
+function renderGoals() {
+  const amountInput = document.getElementById('goal-target-amount');
+  const dateInput = document.getElementById('goal-start-date');
+  const currentEl = document.getElementById('goal-current-value');
+  const targetEl = document.getElementById('goal-target-value');
+  const percentEl = document.getElementById('goal-percent');
+  const statusEl = document.getElementById('goal-status-text');
+  const barEl = document.getElementById('goal-progress-bar');
+  const startLabelEl = document.getElementById('goal-start-date-label');
+  const remainingEl = document.getElementById('goal-remaining-value');
+  const progressEl = barEl?.parentElement;
+  if (!currentEl || !targetEl || !percentEl || !statusEl || !barEl) return;
+
+  const { amount, startDate, profit } = getGoalProgress();
+  if (amountInput && document.activeElement !== amountInput) amountInput.value = amount || '';
+  if (dateInput && document.activeElement !== dateInput) dateInput.value = startDate || '';
+
+  const rawPercent = amount > 0 ? (profit / amount) * 100 : 0;
+  const visualPercent = Math.max(0, Math.min(rawPercent, 100));
+  const remaining = Math.max(amount - profit, 0);
+  const completed = amount > 0 && profit >= amount;
+
+  currentEl.textContent = `${profit >= 0 ? '+' : ''}${formatCurrency(profit)}`;
+  currentEl.className = `text-3xl md:text-4xl font-extrabold ${profit < 0 ? 'text-rose-400' : 'text-slate-100'}`;
+  targetEl.textContent = `de ${formatCurrency(amount)}`;
+  percentEl.textContent = `${Math.max(0, rawPercent).toFixed(1)}%`;
+  percentEl.className = `text-2xl font-extrabold ${completed ? 'text-cyan-300' : 'text-emerald-400'}`;
+  barEl.style.width = `${visualPercent}%`;
+  barEl.className = `h-full rounded-full transition-all duration-500 ${completed ? 'bg-gradient-to-r from-cyan-500 via-emerald-400 to-amber-300' : 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-cyan-400'}`;
+  if (progressEl) progressEl.setAttribute('aria-valuenow', String(Math.round(visualPercent)));
+  if (startLabelEl) startLabelEl.textContent = startDate ? formatDate(startDate) : 'não definido';
+  if (remainingEl) remainingEl.textContent = amount > 0 ? (completed ? `Meta superada em ${formatCurrency(profit - amount)}` : `Faltam ${formatCurrency(remaining)}`) : 'Informe um valor para a meta';
+
+  if (!amount || !startDate) {
+    statusEl.textContent = 'Defina o valor e a data inicial para começar.';
+  } else if (completed) {
+    statusEl.textContent = 'Meta alcançada — continue para superar o objetivo.';
+  } else if (profit < 0) {
+    statusEl.textContent = 'O resultado líquido ainda está negativo neste período.';
+  } else {
+    statusEl.textContent = 'O lucro líquido confirmado desde a data inicial conta para esta meta.';
+  }
+}
+
+function saveGoal() {
+  const amountInput = document.getElementById('goal-target-amount');
+  const dateInput = document.getElementById('goal-start-date');
+  if (!amountInput || !dateInput) return;
+
+  const amount = Math.max(0, parseFloat(amountInput.value) || 0);
+  const startDate = dateInput.value || '';
+  if (amount > 0 && !startDate) {
+    alert('Escolha a data a partir da qual os lucros devem contar para a meta.');
+    dateInput.focus();
+    return;
+  }
+
+  ensureTrackerDataShape();
+  trackerData.goal = { amount, startDate };
+  renderGoals();
+  debouncedSaveData();
 }
 
 // ==========================================
@@ -1069,6 +1229,7 @@ function renderAllDays(filterQuery = '') {
   container.innerHTML = '';
   
   if (trackerData.days.length === 0) {
+    renderPagination('dashboard-pagination', 1, 0, () => {});
     if (emptyState) emptyState.classList.remove('hidden');
     container.appendChild(emptyState);
     if (daysCount) daysCount.textContent = '0 dias ativos';
@@ -1117,6 +1278,7 @@ function renderAllDays(filterQuery = '') {
   }
 
   if (filteredDays.length === 0) {
+    renderPagination('dashboard-pagination', 1, 0, () => {});
     const noResultsMsg = document.createElement('div');
     noResultsMsg.className = 'glass-card rounded-2xl p-8 text-center border border-slate-800 text-slate-450';
     noResultsMsg.innerHTML = `
@@ -1143,8 +1305,10 @@ function renderAllDays(filterQuery = '') {
   });
 
   const sortedDates = Object.keys(daysByDate).sort((a, b) => b.localeCompare(a));
+  dashboardPage = clampPage(dashboardPage, sortedDates.length);
+  const pagedDateKeys = sortedDates.slice((dashboardPage - 1) * DAYS_PER_PAGE, dashboardPage * DAYS_PER_PAGE);
 
-  sortedDates.forEach((dateKey) => {
+  pagedDateKeys.forEach((dateKey) => {
     const sessions = daysByDate[dateKey];
 
     let dateWagered = 0;
@@ -1313,13 +1477,19 @@ function renderAllDays(filterQuery = '') {
     renderBetsSummary();
   }
 
-  if (window.lucide) window.lucide.createIcons();
+  renderPagination('dashboard-pagination', dashboardPage, sortedDates.length, (newPage) => {
+    dashboardPage = newPage;
+    renderAllDays(filterQuery);
+  });
+
+  if (window.lucide) window.lucide.createIcons({ root: container });
 }
 
 // Search input listener for Planilha & Dashboard
 const inputSearchDays = document.getElementById('input-search-days');
 if (inputSearchDays) {
   inputSearchDays.addEventListener('input', (e) => {
+    dashboardPage = 1;
     renderAllDays(e.target.value);
   });
 }
@@ -1632,6 +1802,7 @@ function createNewDay(date, notes) {
   };
 
   trackerData.days.push(newDay);
+  dashboardPage = 1;
   saveData();
   closeNewDayModal();
   renderAllDays();
@@ -1948,7 +2119,7 @@ daysContainer.addEventListener('input', (e) => {
   const dayId = betRow.getAttribute('data-day-id');
   const betId = betRow.getAttribute('data-bet-id');
 
-  updateBetCalculations(dayId, betId, betRow);
+  updateBetCalculations(dayId, betId, betRow, true);
 });
 
 // Selector drop-down delegation
@@ -2401,6 +2572,9 @@ function goToBet(dayId, dateKey) {
     const day = (trackerData.days || []).find(d => d.id === dayId);
     if (day) {
       day.expanded = true;
+      const orderedDates = [...new Set((trackerData.days || []).map(item => item.date).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+      const dateIndex = orderedDates.indexOf(day.date);
+      if (dateIndex >= 0) dashboardPage = Math.floor(dateIndex / DAYS_PER_PAGE) + 1;
       renderAllDays(searchInput ? searchInput.value : '');
     }
   }
@@ -2864,13 +3038,21 @@ function renderHistory() {
     }
 
     if (visibleItems.length === 0) {
+      renderPagination('history-pagination', 1, 0, () => {});
       if (emptyState) emptyState.classList.remove('hidden');
       return;
     }
 
     if (emptyState) emptyState.classList.add('hidden');
 
-    visibleItems.forEach(item => {
+    // Keep every movement from the same calendar date together, then paginate
+    // by ten dates so the bank statement stays coherent.
+    const visibleDateKeys = [...new Set(visibleItems.map(item => item.dateKey || (item.timestamp ? item.timestamp.slice(0, 10) : '')).filter(Boolean))];
+    historyPage = clampPage(historyPage, visibleDateKeys.length);
+    const pagedHistoryDates = new Set(visibleDateKeys.slice((historyPage - 1) * DAYS_PER_PAGE, historyPage * DAYS_PER_PAGE));
+    const pagedItems = visibleItems.filter(item => pagedHistoryDates.has(item.dateKey || (item.timestamp ? item.timestamp.slice(0, 10) : '')));
+
+    pagedItems.forEach(item => {
       const tr = document.createElement('tr');
       const isDayItem = item.category === 'day';
       const isExpanded = isDayItem && expandedHistoryDates.has(item.dateKey);
@@ -2941,7 +3123,12 @@ function renderHistory() {
       renderHistory();
     };
 
-    if (window.lucide) window.lucide.createIcons();
+    renderPagination('history-pagination', historyPage, visibleDateKeys.length, (newPage) => {
+      historyPage = newPage;
+      renderHistory();
+    });
+
+    if (window.lucide) window.lucide.createIcons({ root: tbody });
   } catch (err) {
     console.error('Erro em renderHistory:', err);
   }
@@ -2956,6 +3143,7 @@ const btnBankClearDates = document.getElementById('btn-bank-clear-dates');
 
 function setBankDateRange(start, end, filterType = 'custom') {
   bankFilterType = filterType;
+  historyPage = 1;
   if (bankDateStartInput) bankDateStartInput.value = start || '';
   if (bankDateEndInput) bankDateEndInput.value = end || '';
   if (!start && !end) bankFilterType = 'total';
@@ -2984,10 +3172,12 @@ if (btnBankClearDates) {
 
 if (bankDateStartInput) bankDateStartInput.addEventListener('change', () => {
   bankFilterType = 'custom';
+  historyPage = 1;
   renderHistory();
 });
 if (bankDateEndInput) bankDateEndInput.addEventListener('change', () => {
   bankFilterType = 'custom';
+  historyPage = 1;
   renderHistory();
 });
 
@@ -3009,6 +3199,7 @@ function formatLocalDateInput(date) {
 
 function setSummaryDateRange(start, end, filterType = 'custom') {
   summaryFilterType = filterType;
+  summaryPage = 1;
   if (summaryDateStartInput) summaryDateStartInput.value = start || '';
   if (summaryDateEndInput) summaryDateEndInput.value = end || '';
   if (!start && !end) summaryFilterType = 'total';
@@ -3018,10 +3209,12 @@ function setSummaryDateRange(start, end, filterType = 'custom') {
 
 if (summaryDateStartInput) summaryDateStartInput.addEventListener('change', () => {
   summaryFilterType = 'custom';
+  summaryPage = 1;
   renderBetsSummary();
 });
 if (summaryDateEndInput) summaryDateEndInput.addEventListener('change', () => {
   summaryFilterType = 'custom';
+  summaryPage = 1;
   renderBetsSummary();
 });
 if (btnSummaryClearDates) btnSummaryClearDates.addEventListener('click', () => setSummaryDateRange('', '', 'total'));
@@ -3095,6 +3288,7 @@ function renderBetsSummary() {
   });
 
   if (daysInRange.length === 0) {
+    renderPagination('summary-pagination', 1, 0, () => {});
     if (emptyState) emptyState.classList.remove('hidden');
     if (summaryTotalStakedEl) summaryTotalStakedEl.textContent = formatCurrency(0);
     if (summaryTotalWonEl) summaryTotalWonEl.textContent = formatCurrency(0);
@@ -3132,6 +3326,8 @@ function renderBetsSummary() {
   });
 
   const sortedDateKeys = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+  summaryPage = clampPage(summaryPage, sortedDateKeys.length);
+  const pagedDateKeys = new Set(sortedDateKeys.slice((summaryPage - 1) * DAYS_PER_PAGE, summaryPage * DAYS_PER_PAGE));
 
   if (summaryDaysCountEl) {
     const totalUniqueDays = sortedDateKeys.length;
@@ -3191,6 +3387,8 @@ function renderBetsSummary() {
     grandTotalLost += totalLost;
     grandNetProfit += netProfit;
     grandTotalBets += dayBetsTotal;
+
+    if (!pagedDateKeys.has(dateKey)) return;
 
     const formattedDate = formatDate(dateKey);
     const notesJoined = Array.from(new Set(group.notes)).join(' • ') || '-';
@@ -3374,8 +3572,13 @@ function renderBetsSummary() {
     }
   }
 
+  renderPagination('summary-pagination', summaryPage, sortedDateKeys.length, (newPage) => {
+    summaryPage = newPage;
+    renderBetsSummary();
+  });
+
   if (window.lucide) {
-    window.lucide.createIcons();
+    window.lucide.createIcons({ root: tbody });
   }
 }
 
@@ -3717,6 +3920,7 @@ const tabCalculator = document.getElementById('tab-calculator');
 const tabHistory = document.getElementById('tab-history');
 const tabNotes = document.getElementById('tab-notes');
 const tabFreebets = document.getElementById('tab-freebets');
+const tabGoals = document.getElementById('tab-goals');
 const btnHeaderNotes = document.getElementById('btn-header-notes');
 const btnFreebetHeaderCount = document.getElementById('freebet-count');
 
@@ -3726,6 +3930,7 @@ const contentCalculator = document.getElementById('content-calculator');
 const contentHistory = document.getElementById('content-history');
 const contentNotes = document.getElementById('content-notes');
 const contentFreebets = document.getElementById('content-freebets');
+const contentGoals = document.getElementById('content-goals');
 const inputSearchFreebetDays = document.getElementById('input-search-freebet-days');
 
 function deactivateAllTabs() {
@@ -3737,6 +3942,7 @@ function deactivateAllTabs() {
   if (tabHistory) tabHistory.className = inactiveClass;
   if (tabNotes) tabNotes.className = inactiveClass;
   if (tabFreebets) tabFreebets.className = inactiveClass;
+  if (tabGoals) tabGoals.className = inactiveClass;
   
   if (contentDashboard) contentDashboard.classList.add('hidden');
   if (contentBetsSummary) contentBetsSummary.classList.add('hidden');
@@ -3744,6 +3950,7 @@ function deactivateAllTabs() {
   if (contentHistory) contentHistory.classList.add('hidden');
   if (contentNotes) contentNotes.classList.add('hidden');
   if (contentFreebets) contentFreebets.classList.add('hidden');
+  if (contentGoals) contentGoals.classList.add('hidden');
 }
 
 const activeTabClass = "px-4 md:px-5 py-3 text-xs md:text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2 shrink-0";
@@ -3795,6 +4002,14 @@ function activateFreebetsTab() {
   if (window.location.hash !== '#freebets') window.location.hash = 'freebets';
 }
 
+function activateGoalsTab() {
+  deactivateAllTabs();
+  if (tabGoals) tabGoals.className = activeTabClass;
+  if (contentGoals) contentGoals.classList.remove('hidden');
+  renderGoals();
+  if (window.location.hash !== '#goals') window.location.hash = 'goals';
+}
+
 // Hash Routing Handler
 function handleHashNavigation() {
   const hash = window.location.hash.toLowerCase();
@@ -3808,6 +4023,8 @@ function handleHashNavigation() {
     activateNotesTab();
   } else if (hash === '#freebets') {
     activateFreebetsTab();
+  } else if (hash === '#goals') {
+    activateGoalsTab();
   } else {
     // Default or #dashboard
     if (contentDashboard && contentDashboard.classList.contains('hidden')) {
@@ -3824,6 +4041,10 @@ if (tabCalculator) tabCalculator.addEventListener('click', activateCalculatorTab
 if (tabHistory) tabHistory.addEventListener('click', activateHistoryTab);
 if (tabNotes) tabNotes.addEventListener('click', activateNotesTab);
 if (tabFreebets) tabFreebets.addEventListener('click', activateFreebetsTab);
+if (tabGoals) tabGoals.addEventListener('click', activateGoalsTab);
+
+const btnSaveGoal = document.getElementById('btn-save-goal');
+if (btnSaveGoal) btnSaveGoal.addEventListener('click', saveGoal);
 
 if (btnHeaderNotes) btnHeaderNotes.addEventListener('click', activateNotesTab);
 if (btnFreebetHeaderCount) btnFreebetHeaderCount.addEventListener('click', activateFreebetsTab);
@@ -5589,7 +5810,7 @@ async function handleLogout() {
       console.error('Erro ao fazer logout:', e);
     }
   }
-  trackerData = { days: [], dailyNotes: [] };
+  trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
   globalBalance = 0;
   balanceHistory = [];
   updateAppForSession(null);
