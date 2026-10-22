@@ -1,13 +1,39 @@
 // ==========================================
-// STATE MANAGEMENT & DATA PERSISTENCE (SUPABASE & REALTIME)
+// SECURITY UTILITIES & DATA PERSISTENCE (SUPABASE & REALTIME)
 // ==========================================
 
-const SUPABASE_URL = 'https://lakilyuxnvxexkmophkl.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
+/**
+ * Sanitiza strings fornecidas pelo usuário para prevenir ataques XSS (Cross-Site Scripting).
+ * Converte caracteres especiais (&, <, >, ", ', `) em entidades HTML seguras.
+ * @param {string|number|null|undefined} str
+ * @returns {string}
+ */
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/`/g, '&#x60;');
+}
+
+// Carregamento dinâmico e seguro de credenciais (sem expor segredos hardcoded no repositório)
+// Ordem de precedência: window.__CONFIG__ (config.js) -> window.__ENV__ -> localStorage
+const SUPABASE_URL = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_URL || window.__ENV__?.SUPABASE_URL))
+  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_URL') || '') : '');
+
+const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_ANON_KEY))
+  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_ANON_KEY') || '') : '');
 
 let supabaseClient = null;
-if (window.supabase && typeof window.supabase.createClient === 'function') {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (err) {
+    console.error('Falha ao inicializar o cliente Supabase:', err);
+  }
 }
 
 let trackerData = { days: [], dailyNotes: [] };
@@ -364,9 +390,9 @@ function renderPagination(containerId, page, totalItems, onPageChange) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800 pt-4">
       <span class="text-xs text-slate-500">Mostrando ${firstItem}–${lastItem} de ${totalItems} dias</span>
       <div class="flex items-center gap-2">
-        <button type="button" data-page-action="prev" ${page === 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-indigo-500/50">Anterior</button>
-        <span class="text-xs font-bold text-indigo-400 px-2">Página ${page} de ${totalPages}</span>
-        <button type="button" data-page-action="next" ${page === totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-indigo-500/50">Próxima</button>
+        <button type="button" data-page-action="prev" ${page === 1 ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-500/50">Anterior</button>
+        <span class="text-xs font-bold text-blue-400 px-2">Página ${page} de ${totalPages}</span>
+        <button type="button" data-page-action="next" ${page === totalPages ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-xs font-semibold text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-500/50">Próxima</button>
       </div>
     </div>
   `;
@@ -582,7 +608,7 @@ function updateBetVisuals(bet, rowElement) {
   }
 
   if (statusSelect) {
-    statusSelect.className = 'w-full bg-slate-950/60 border rounded-xl px-2.5 py-1.5 text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 cursor-pointer shadow-inner';
+    statusSelect.className = 'w-full bg-slate-950/60 border rounded-xl px-2.5 py-1.5 text-sm text-slate-200 focus:border-blue-500 focus:bg-slate-950 cursor-pointer shadow-inner';
     if (bet.status === 'green') {
       statusSelect.classList.add('border-emerald-500/40', 'text-emerald-450');
     } else if (bet.status === 'red') {
@@ -590,25 +616,25 @@ function updateBetVisuals(bet, rowElement) {
     } else if (bet.status === 'refunded') {
       statusSelect.classList.add('border-slate-800', 'text-slate-400');
     } else {
-      statusSelect.classList.add('border-amber-500/30', 'text-amber-450');
+      statusSelect.classList.add('border-amber-500/30', 'text-amber-400');
     }
   }
 
   if (freebetBtn) {
     freebetBtn.setAttribute('data-active', bet.freebet ? 'true' : 'false');
     if (bet.freebet) {
-      freebetBtn.className = 'btn-freebet flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all bg-indigo-650/20 border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/5';
+      freebetBtn.className = 'btn-freebet flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all bg-blue-600/20 border-blue-500/40 text-blue-300 shadow-sm';
     } else {
-      freebetBtn.className = 'btn-freebet flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all bg-slate-950/40 border-slate-850/80 text-slate-450 hover:border-slate-800';
+      freebetBtn.className = 'btn-freebet flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700';
     }
   }
 
   if (boostBtn) {
     boostBtn.setAttribute('data-active', bet.boostActive ? 'true' : 'false');
     if (bet.boostActive) {
-      boostBtn.className = 'btn-boost flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10';
+      boostBtn.className = 'btn-boost flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-sm';
     } else {
-      boostBtn.className = 'btn-boost flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all bg-slate-950/60 border-slate-850/80 text-slate-400 hover:text-amber-400';
+      boostBtn.className = 'btn-boost flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all bg-slate-950/60 border-slate-800 text-slate-400 hover:text-amber-400';
     }
   }
 
@@ -864,20 +890,20 @@ function updateGlobalStats() {
 
   if (activeBalanceSubEl) {
     if (totalDaysCount === 0) {
-      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl font-bold tracking-tight text-slate-400';
-      if (activeBalanceIconEl) activeBalanceIconEl.className = 'p-2 bg-slate-900/60 rounded-lg text-slate-400';
-      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300';
-      activeBalanceSubEl.innerHTML = '<span class="text-slate-400">Nenhum dia cadastrado</span>';
+      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-400';
+      if (activeBalanceIconEl) activeBalanceIconEl.className = 'p-2 bg-slate-800/80 rounded-lg text-slate-400';
+      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300';
+      activeBalanceSubEl.innerHTML = '<span class="text-slate-400 text-xs font-medium">Nenhum dia cadastrado</span>';
     } else if (activeDaysCount > 0) {
-      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl font-bold tracking-tight text-emerald-400';
+      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-emerald-400';
       if (activeBalanceIconEl) activeBalanceIconEl.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400';
-      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-2xl p-5 border border-emerald-500/30 flex flex-col justify-between transition-all duration-300 glow-green bg-emerald-950/10';
-      activeBalanceSubEl.innerHTML = `<span class="flex items-center gap-1.5 text-emerald-400/90 font-medium"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> ${activeDaysCount} de ${totalDaysCount} dia(s) com saldo ativo</span>`;
+      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-xl p-5 border border-emerald-500/30 flex flex-col justify-between transition-all duration-300 glow-green bg-emerald-950/10';
+      activeBalanceSubEl.innerHTML = `<span class="flex items-center gap-1.5 text-emerald-400 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> ${activeDaysCount} de ${totalDaysCount} dia(s) com saldo ativo</span>`;
     } else {
-      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl font-bold tracking-tight text-rose-400';
-      if (activeBalanceIconEl) activeBalanceIconEl.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400';
-      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-2xl p-5 border border-rose-500/30 flex flex-col justify-between transition-all duration-300 glow-red bg-rose-950/10';
-      activeBalanceSubEl.innerHTML = '<span class="flex items-center gap-1.5 text-rose-400/90 font-medium"><span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Saldo não está ativo no momento</span>';
+      if (activeBalanceValEl) activeBalanceValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-300';
+      if (activeBalanceIconEl) activeBalanceIconEl.className = 'p-2 bg-slate-800/80 rounded-lg text-slate-400';
+      if (activeBalanceCardEl) activeBalanceCardEl.className = 'glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all duration-300';
+      activeBalanceSubEl.innerHTML = '<span class="flex items-center gap-1.5 text-slate-400 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 inline-block"></span> Nenhuma sessão ativa no momento</span>';
     }
   }
 
@@ -886,24 +912,24 @@ function updateGlobalStats() {
     profitValEl.textContent = (netProfit >= 0 ? '+' : '') + formatCurrency(netProfit);
     
     // Reset classes
-    profitCardEl.className = 'lg:col-span-1 glass-card rounded-2xl p-5 border flex flex-col justify-between transition-all duration-300';
+    profitCardEl.className = 'lg:col-span-1 glass-card rounded-xl p-5 border flex flex-col justify-between transition-all duration-300';
     profitIconContainerEl.className = 'p-2 rounded-lg';
     
     if (netProfit > 0) {
       profitCardEl.classList.add('border-emerald-500/30', 'glow-green', 'bg-emerald-950/10');
-      profitValEl.className = 'text-2xl font-bold tracking-tight text-emerald-500';
-      profitSubEl.innerHTML = `<span class="flex items-center gap-1 text-emerald-500/80"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 inline-block"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg> Saldo Positivo</span>`;
-      profitIconContainerEl.className = 'p-2 rounded-lg bg-emerald-950/80 text-emerald-500';
+      profitValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-emerald-400';
+      profitSubEl.innerHTML = `<span class="flex items-center gap-1 text-emerald-400 text-xs font-medium"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg> Saldo Positivo</span>`;
+      profitIconContainerEl.className = 'p-2 rounded-lg bg-emerald-950/80 text-emerald-400';
     } else if (netProfit < 0) {
       profitCardEl.classList.add('border-rose-500/30', 'glow-red', 'bg-rose-950/10');
-      profitValEl.className = 'text-2xl font-bold tracking-tight text-rose-500';
-      profitSubEl.innerHTML = `<span class="flex items-center gap-1 text-rose-500/80"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 inline-block"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"></polyline><polyline points="16 17 22 17 22 11"></polyline></svg> Saldo Negativo</span>`;
-      profitIconContainerEl.className = 'p-2 rounded-lg bg-rose-950/80 text-rose-500';
+      profitValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-rose-400';
+      profitSubEl.innerHTML = `<span class="flex items-center gap-1 text-rose-400 text-xs font-medium"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"></polyline><polyline points="16 17 22 17 22 11"></polyline></svg> Saldo Negativo</span>`;
+      profitIconContainerEl.className = 'p-2 rounded-lg bg-rose-950/80 text-rose-400';
     } else {
       profitCardEl.classList.add('border-slate-800', 'glow-neutral');
-      profitValEl.className = 'text-2xl font-bold tracking-tight text-slate-100';
-      profitSubEl.innerHTML = `<span class="text-slate-400">Sem lucros ou prejuízos</span>`;
-      profitIconContainerEl.className = 'p-2 rounded-lg bg-slate-900/60 text-indigo-400';
+      profitValEl.className = 'text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-100';
+      profitSubEl.innerHTML = `<span class="text-slate-400 text-xs">Sem lucros ou prejuízos</span>`;
+      profitIconContainerEl.className = 'p-2 rounded-lg bg-slate-800/80 text-slate-400';
     }
   }
 
@@ -1029,66 +1055,66 @@ function createDayElement(day) {
   div.setAttribute('data-day-id', day.id);
 
   div.innerHTML = `
-    <div class="day-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:p-4 bg-slate-900/30 hover:bg-slate-900/50 transition-colors cursor-pointer select-none">
+    <div class="day-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:p-4 bg-slate-900/30 hover:bg-slate-900/60 transition-colors cursor-pointer select-none">
       
       <!-- Esquerda: Chevron, Data, Obs, Editar -->
       <div class="flex items-center justify-between md:justify-start gap-2.5 min-w-0 flex-1">
         <div class="flex items-center gap-2 min-w-0">
-          <button class="btn-toggle-expand p-1.5 hover:bg-slate-800/80 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
+          <button class="btn-toggle-expand p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
             <i data-lucide="chevron-right" class="w-5 h-5 transition-transform duration-200 ${day.expanded ? 'rotate-90' : ''}"></i>
           </button>
 
           <span class="text-sm font-bold text-slate-100 flex items-center gap-1.5 shrink-0">
-            <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i>
+            <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
             ${formatDate(day.date)}
           </span>
 
           ${day.notes ? `
-          <span class="text-xs px-2.5 py-0.5 bg-slate-950/85 border border-slate-800 rounded-full text-slate-300 truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]" title="${day.notes}">
-            Obs: <span class="font-medium text-slate-400">${day.notes}</span>
+          <span class="text-xs px-2.5 py-0.5 bg-slate-950 border border-slate-800 rounded-full text-slate-300 truncate max-w-[120px] sm:max-w-[240px] md:max-w-[320px]" title="${escapeHTML(day.notes)}">
+            Obs: <span class="font-medium text-slate-400">${escapeHTML(day.notes)}</span>
           </span>
           ` : ''}
 
-          <button class="btn-edit-day text-slate-500 hover:text-indigo-400 p-1 hover:bg-slate-800 rounded-lg transition-colors shrink-0" title="Editar Data/Observações">
+          <button class="btn-edit-day text-slate-500 hover:text-blue-400 p-1 hover:bg-slate-800 rounded-lg transition-colors shrink-0" title="Editar Data/Observações">
             <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
           </button>
         </div>
       </div>
 
       <!-- Centro: Apostado, Retorno Total e Resultado -->
-      <div class="grid grid-cols-3 md:flex items-center justify-between md:justify-center gap-2 md:gap-3 text-[11px] md:text-xs md:w-[480px] md:min-w-[480px] shrink-0 py-2 md:py-0 px-2 md:px-4 bg-slate-950/60 md:bg-transparent rounded-xl md:rounded-none border md:border-y-0 md:border-x border-slate-800/60 text-center md:text-left whitespace-nowrap">
+      <div class="grid grid-cols-3 md:flex items-center justify-between md:justify-center gap-2 md:gap-3 text-xs md:w-[480px] md:min-w-[480px] shrink-0 py-2 md:py-0 px-2 md:px-4 bg-slate-950/60 md:bg-transparent rounded-lg md:rounded-none border md:border-y-0 md:border-x border-slate-800/60 text-center md:text-left whitespace-nowrap">
         <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
-          <span class="text-slate-500 md:text-slate-450 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Apostado</span>
-          <strong class="text-slate-200 day-total-wagered text-xs md:text-xs">R$ 0,00</strong>
+          <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Apostado</span>
+          <strong class="text-slate-200 day-total-wagered font-bold">${formatCurrency(0)}</strong>
         </div>
-        <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1 border-x md:border-x-0 border-slate-800/60 px-1 md:px-0">
-          <span class="text-slate-500 md:text-slate-450 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Retorno</span>
-          <strong class="text-slate-400 day-total-return text-xs md:text-xs">R$ 0,00</strong>
+        <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1 border-x md:border-x-0 border-slate-800 px-1 md:px-0">
+          <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Retorno</span>
+          <strong class="text-slate-200 day-total-return font-bold">${formatCurrency(0)}</strong>
         </div>
         <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
-          <span class="text-slate-500 md:text-slate-450 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Resultado</span>
-          <strong class="day-net-profit text-slate-200 text-xs md:text-xs">R$ 0,00</strong>
+          <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Resultado</span>
+          <strong class="day-net-profit text-slate-200 font-extrabold">${formatCurrency(0)}</strong>
         </div>
       </div>
 
       <!-- Direita: Status, Duplicar, Nova Aposta, Excluir -->
       <div class="flex items-center gap-2 shrink-0 justify-between md:justify-end border-t md:border-t-0 border-slate-900/60 pt-2 md:pt-0">
         <div class="flex items-center gap-1.5">
-          <button class="btn-toggle-day-status flex items-center justify-center p-1.5 rounded-xl border transition-all duration-250 cursor-pointer ${day.active !== false ? 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-500/25' : 'bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border-rose-500/25'}" title="Status: ${day.active !== false ? 'Ativo' : 'Inativo'}">
+          <button class="btn-toggle-day-status flex items-center justify-center p-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${day.active !== false ? 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-500/25' : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 border-slate-700/50'}" title="Status: ${day.active !== false ? 'Ativo' : 'Inativo'}">
             ${day.active !== false ? 
-              `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 md:w-4.5 md:h-4.5"><rect width="20" height="12" x="2" y="6" rx="6" ry="6"></rect><circle cx="16" cy="12" r="2"></circle></svg>` : 
-              `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 md:w-4.5 md:h-4.5"><rect width="20" height="12" x="2" y="6" rx="6" ry="6"></rect><circle cx="8" cy="12" r="2"></circle></svg>`
+              `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><rect width="20" height="12" x="2" y="6" rx="6" ry="6"></rect><circle cx="16" cy="12" r="2"></circle></svg>` : 
+              `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><rect width="20" height="12" x="2" y="6" rx="6" ry="6"></rect><circle cx="8" cy="12" r="2"></circle></svg>`
             }
           </button>
-          <button class="btn-duplicate-day text-slate-500 hover:text-indigo-400 p-1.5 hover:bg-slate-800 rounded-xl transition-colors" title="Duplicar Dia Todo">
+          <button class="btn-duplicate-day text-slate-500 hover:text-blue-400 p-1.5 hover:bg-slate-800 rounded-lg transition-colors" title="Duplicar Dia Todo">
             <i data-lucide="copy" class="w-4 h-4"></i>
           </button>
-          <button class="btn-delete-day text-slate-500 hover:text-rose-500 p-1.5 hover:bg-slate-800 rounded-xl transition-colors" title="Excluir Dia">
+          <button class="btn-delete-day text-slate-500 hover:text-rose-400 p-1.5 hover:bg-slate-800 rounded-lg transition-colors" title="Excluir Dia">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         </div>
 
-        <button class="btn-add-bet flex items-center gap-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/25 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-sm">
+        <button class="btn-add-bet flex items-center gap-1.5 bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           Nova Aposta
         </button>
@@ -1130,7 +1156,7 @@ function createBetRowElement(dayId, bet) {
     <!-- Casa de Aposta -->
     <div class="col-span-2 md:col-span-2 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Casa de Aposta</label>
-      <input type="text" data-field="bookmaker" value="${bet.bookmaker || ''}" placeholder="Ex: Betfair / Bet365" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner">
+      <input type="text" data-field="bookmaker" value="${escapeHTML(bet.bookmaker || '')}" placeholder="Ex: Betfair / Bet365" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs md:text-sm text-slate-200 focus:border-blue-500 focus:bg-slate-950 shadow-inner">
     </div>
 
     <!-- Tipo (Exchange Back / Lay) -->
@@ -1156,7 +1182,7 @@ function createBetRowElement(dayId, bet) {
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Stake (R$)</label>
       <div class="relative">
         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">R$</span>
-        <input type="number" data-field="stake" value="${bet.stake || ''}" placeholder="0,00" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner font-medium">
+        <input type="number" data-field="stake" value="${bet.stake || ''}" placeholder="0,00" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-7 pr-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-blue-500 focus:bg-slate-950 shadow-inner font-medium">
       </div>
       <span class="liability-badge text-[10px] text-pink-400 font-semibold mt-1 hidden truncate"></span>
     </div>
@@ -1164,7 +1190,7 @@ function createBetRowElement(dayId, bet) {
     <!-- Odd -->
     <div class="col-span-1 md:col-span-1 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Odd</label>
-      <input type="number" data-field="odd" value="${bet.odd || ''}" placeholder="1.85" step="0.01" min="1" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-indigo-500 focus:bg-slate-950 shadow-inner font-medium">
+      <input type="number" data-field="odd" value="${bet.odd || ''}" placeholder="1.85" step="0.01" min="1" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs md:text-sm text-slate-200 focus:border-blue-500 focus:bg-slate-950 shadow-inner font-medium">
     </div>
     
     <!-- % Aumentada -->
@@ -1193,7 +1219,7 @@ function createBetRowElement(dayId, bet) {
     <!-- Status -->
     <div class="col-span-1 md:col-span-1 flex flex-col">
       <label class="text-[9px] text-slate-500 uppercase font-bold md:hidden mb-1">Status</label>
-      <select data-field="status" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-1.5 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:bg-slate-950 cursor-pointer shadow-inner">
+      <select data-field="status" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-1.5 py-1.5 text-xs text-slate-200 focus:border-blue-500 focus:bg-slate-950 cursor-pointer shadow-inner">
         <option value="pending" ${bet.status === 'pending' ? 'selected' : ''}>🟡 Pendente</option>
         <option value="green" ${bet.status === 'green' ? 'selected' : ''}>🟢 Green</option>
         <option value="red" ${bet.status === 'red' ? 'selected' : ''}>🔴 Red</option>
@@ -1285,12 +1311,12 @@ function renderAllDays(filterQuery = '') {
   if (filteredDays.length === 0) {
     renderPagination('dashboard-pagination', 1, 0, () => {});
     const noResultsMsg = document.createElement('div');
-    noResultsMsg.className = 'glass-card rounded-2xl p-8 text-center border border-slate-800 text-slate-450';
+    noResultsMsg.className = 'glass-card rounded-xl p-8 text-center border border-slate-800 text-slate-450';
     noResultsMsg.innerHTML = `
-      <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800 text-slate-500 w-fit mx-auto mb-3">
+      <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-slate-500 w-fit mx-auto mb-3">
         <i data-lucide="search-x" class="w-8 h-8"></i>
       </div>
-      <p class="text-sm font-medium text-slate-300">Nenhum dia encontrado para "${query}"</p>
+      <p class="text-sm font-medium text-slate-300">Nenhum dia encontrado para "${escapeHTML(query)}"</p>
       <p class="text-xs text-slate-500 mt-1">Tente buscar por outra data (ex: 01/08) ou pela observação do dia.</p>
     `;
     container.appendChild(noResultsMsg);
@@ -1349,61 +1375,60 @@ function renderAllDays(filterQuery = '') {
     });
 
     const dateCard = document.createElement('div');
-    dateCard.className = 'dashboard-date-group glass-card rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
+    dateCard.className = 'dashboard-date-group glass-card rounded-xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
     dateCard.setAttribute('data-date-key', dateKey);
 
     const formattedDate = formatDate(dateKey);
-    const profitColor = dateNetProfit > 0 ? 'text-emerald-400' : (dateNetProfit < 0 ? 'text-rose-400' : 'text-slate-400');
-    const returnColor = dateReturn > dateWagered ? 'text-emerald-400' : (dateReturn < dateWagered ? 'text-rose-400' : 'text-slate-400');
+    const profitColor = dateNetProfit > 0 ? 'text-emerald-400' : (dateNetProfit < 0 ? 'text-rose-400' : 'text-slate-300');
     const profitSign = dateNetProfit > 0 ? '+' : '';
 
     // Auto expand if searching
     const isExpanded = query.length > 0;
 
     dateCard.innerHTML = `
-      <div class="date-group-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:p-4 bg-slate-900/50 hover:bg-slate-900/80 transition-colors cursor-pointer select-none">
+      <div class="date-group-header flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:p-4 bg-slate-900/60 hover:bg-slate-850/80 transition-colors cursor-pointer select-none">
         
         <div class="flex items-center justify-between md:justify-start gap-2.5 min-w-0 flex-1">
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0">
             <button type="button" class="btn-toggle-date-group p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
               <i data-lucide="chevron-right" class="date-chevron-icon w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"></i>
             </button>
 
-            <span class="text-sm md:text-base font-bold text-slate-100 flex items-center gap-1.5 shrink-0">
-              <i data-lucide="calendar" class="w-4 h-4 md:w-4.5 md:h-4.5 text-indigo-400"></i>
+            <span class="text-sm md:text-base font-bold text-slate-100 flex items-center gap-2 shrink-0">
+              <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
               ${formattedDate}
             </span>
 
-            <span class="text-[10px] md:text-xs px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full font-semibold shrink-0">
+            <span class="text-[11px] px-2.5 py-0.5 bg-slate-800/80 border border-slate-700/60 text-slate-300 rounded-full font-medium shrink-0">
               ${sessions.length} ${sessions.length === 1 ? 'aposta' : 'apostas'}
             </span>
           </div>
 
-          <button type="button" class="btn-delete-date-group md:hidden p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
+          <button type="button" class="btn-delete-date-group md:hidden p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-lg transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         </div>
 
-        <div class="flex items-center gap-3 text-xs md:w-[520px] md:min-w-[520px] shrink-0 pt-2 md:pt-0 border-t md:border-t-0 md:border-l border-slate-800/60 md:pl-4 justify-between md:justify-end">
+        <div class="flex items-center gap-3 text-xs md:w-[500px] md:min-w-[500px] shrink-0 pt-2 md:pt-0 border-t md:border-t-0 md:border-l border-slate-800/80 md:pl-4 justify-between md:justify-end">
           
-          <div class="grid grid-cols-3 md:flex items-center gap-1.5 md:gap-3 text-[11px] md:text-xs text-center md:text-left flex-1 md:flex-initial bg-slate-950/60 md:bg-transparent p-2 md:p-0 rounded-xl md:rounded-none border md:border-0 border-slate-800/60">
-            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
-              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Apostado</span>
-              <strong class="text-slate-200 font-semibold date-total-wagered text-xs">${formatCurrency(dateWagered)}</strong>
+          <div class="grid grid-cols-3 md:flex items-center gap-2 md:gap-4 text-xs text-center md:text-left flex-1 md:flex-initial bg-slate-950/80 md:bg-slate-950/50 py-1.5 px-3 rounded-lg border border-slate-800/80">
+            <div class="flex flex-col md:flex-row md:items-center gap-1">
+              <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Apostado</span>
+              <strong class="text-slate-100 font-bold date-total-wagered">${formatCurrency(dateWagered)}</strong>
             </div>
 
-            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1 border-x md:border-x-0 border-slate-800/60 px-1 md:px-0">
-              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Retorno</span>
-              <strong class="${returnColor} font-semibold date-total-return text-xs">${formatCurrency(dateReturn)}</strong>
+            <div class="flex flex-col md:flex-row md:items-center gap-1 border-x md:border-x-0 border-slate-800 px-2 md:px-0">
+              <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Retorno</span>
+              <strong class="text-slate-200 font-bold date-total-return">${formatCurrency(dateReturn)}</strong>
             </div>
 
-            <div class="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
-              <span class="text-slate-500 md:text-slate-400 text-[9px] md:text-xs uppercase md:normal-case font-semibold md:font-normal">Resultado</span>
-              <strong class="date-net-profit ${profitColor} font-bold text-xs">${profitSign}${formatCurrency(dateNetProfit)}</strong>
+            <div class="flex flex-col md:flex-row md:items-center gap-1">
+              <span class="text-slate-400 text-[10px] md:text-xs uppercase md:normal-case font-medium">Resultado</span>
+              <strong class="date-net-profit ${profitColor} font-extrabold">${profitSign}${formatCurrency(dateNetProfit)}</strong>
             </div>
           </div>
           
-          <button type="button" class="btn-delete-date-group hidden md:block ml-1.5 p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 rounded-xl transition-all border border-transparent hover:border-rose-500/30 shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
+          <button type="button" class="btn-delete-date-group hidden md:block ml-1 p-1.5 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500 hover:border-rose-500/30 rounded-lg transition-colors border border-transparent shrink-0" title="Excluir Todo o Dia ${formattedDate}" data-date-key="${dateKey}">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         </div>
@@ -1726,7 +1751,7 @@ function showConfirmDeleteBet(dayId, betId) {
   const bet = day.bets.find(b => b.id === betId);
   if (!bet) return;
 
-  const desc = bet.bookmaker ? `<strong class="text-indigo-300 font-semibold">"${bet.bookmaker}"</strong>` : 'esta aposta';
+  const desc = bet.bookmaker ? `<strong class="text-blue-300 font-semibold">"${escapeHTML(bet.bookmaker)}"</strong>` : 'esta aposta';
   showConfirm(`Tem certeza que deseja excluir a aposta ${desc}?`, () => {
     day.bets = day.bets.filter(b => b.id !== betId);
     saveData();
@@ -2425,7 +2450,7 @@ let currentBalanceMode = 'direct'; // 'direct' or 'calc'
 
 function setBalanceMode(mode) {
   currentBalanceMode = mode;
-  const activeBtnClass = "flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20";
+  const activeBtnClass = "flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-colors flex items-center justify-center gap-1.5 shadow-sm";
   const inactiveBtnClass = "flex-1 py-1.5 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center gap-1.5";
 
   if (mode === 'calc') {
@@ -2562,11 +2587,12 @@ function formatDateTime(isoString) {
   if (isNaN(date.getTime())) return '-';
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
+  const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekday = weekdays[date.getDay()];
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   
-  return `${day}/${month}/${year} às ${hours}:${minutes}`;
+  return `${day}/${month} (${weekday}) <span class="text-xs text-slate-500 font-normal ml-1">às ${hours}:${minutes}</span>`;
 }
 
 let expandedHistoryDates = new Set();
@@ -2623,9 +2649,9 @@ function goToBet(dayId, dateKey) {
 
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-      targetEl.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-slate-950', 'transition-all', 'duration-500');
+      targetEl.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'ring-offset-slate-950', 'transition-all', 'duration-500');
       setTimeout(() => {
-        targetEl.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-slate-950');
+        targetEl.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2', 'ring-offset-slate-950');
       }, 3000);
     }
   }, 120);
@@ -2645,7 +2671,7 @@ function renderHistorySessionsHtml(sessions, displayDate, itemWageredText, itemR
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 hover:border-slate-700/80 transition-colors text-xs">
         <span class="font-semibold text-slate-200 truncate">${session.title || `Aposta #${index + 1}`}</span>
         <div class="flex items-center gap-2.5 text-[11px] shrink-0">
-          <button type="button" class="btn-go-to-bet flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded-md border border-indigo-500/30 transition-all shrink-0 cursor-pointer" ${dayIdAttr} ${dateKeyAttr} title="Ir para esta aposta na Planilha">
+          <button type="button" class="btn-go-to-bet flex items-center gap-1 text-[11px] font-semibold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded-md border border-blue-500/30 transition-all shrink-0 cursor-pointer" ${dayIdAttr} ${dateKeyAttr} title="Ir para esta aposta na Planilha">
             <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
             <span>Ver aposta</span>
           </button>
@@ -2659,7 +2685,7 @@ function renderHistorySessionsHtml(sessions, displayDate, itemWageredText, itemR
   return `
     <div class="bg-slate-900/70 rounded-xl p-3.5 border border-slate-800/80 space-y-2.5">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-bold text-slate-300 border-b border-slate-800/80 pb-2">
-        <span class="flex items-center gap-1.5 text-indigo-400"><i data-lucide="list" class="w-4 h-4"></i>Apostas do Dia em ${displayDate} (${list.length} ${list.length === 1 ? 'aposta' : 'apostas'}):</span>
+        <span class="flex items-center gap-1.5 text-blue-400"><i data-lucide="list" class="w-4 h-4"></i>Apostas do Dia em ${displayDate} (${list.length} ${list.length === 1 ? 'aposta' : 'apostas'}):</span>
         <span class="text-[11px] text-slate-400 font-normal">Apostado: <strong class="text-slate-200">${itemWageredText}</strong> | Retorno: <strong class="text-emerald-400">${itemReturnText}</strong></span>
       </div>
       <div class="space-y-1.5">${rows}</div>
@@ -2710,21 +2736,21 @@ function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemRetur
       const boostVal = parseFloat(bet.boostPercent || 0);
 
       return `
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 hover:border-slate-700/80 transition-colors text-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-slate-950/70 border border-slate-800/70 hover:border-slate-700 transition-colors text-sm">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${isLay ? 'bg-purple-950/80 text-purple-300 border border-purple-800/50' : 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/50'} uppercase shrink-0">
+            <span class="px-2 py-0.5 rounded-md text-xs font-bold ${isLay ? 'bg-purple-950/80 text-purple-300 border border-purple-800/50' : 'bg-blue-950/80 text-blue-300 border border-blue-800/50'} uppercase shrink-0">
               ${isLay ? 'Lay' : 'Back'}
             </span>
-            <span class="font-semibold text-slate-200 truncate">${desc}</span>
-            ${bet.freebet ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/50 shrink-0">FREEBET</span>' : ''}
-            ${bet.boostActive && boostVal > 0 ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 shrink-0">+${boostVal}%</span>` : ''}
+            <span class="font-semibold text-slate-200 truncate text-sm">${escapeHTML(desc)}</span>
+            ${bet.freebet ? '<span class="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950/80 text-amber-300 border border-amber-800/50 shrink-0">FREEBET</span>' : ''}
+            ${bet.boostActive && boostVal > 0 ? `<span class="px-2 py-0.5 rounded-md text-xs font-bold bg-blue-950/80 text-blue-300 border border-blue-800/50 shrink-0">+${boostVal}%</span>` : ''}
           </div>
 
-          <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-            <span class="text-slate-400 text-[11px]">Odd: <strong class="text-slate-200 font-bold">${odd > 0 ? odd.toFixed(2) : '-'}</strong></span>
-            <span class="text-slate-400 text-[11px]">Apostado: <strong class="text-slate-200 font-bold">${formatCurrency(riskAmount)}</strong></span>
+          <div class="flex items-center gap-3.5 shrink-0 self-end sm:self-auto">
+            <span class="text-slate-400 text-xs">Odd: <strong class="text-slate-200 font-bold">${odd > 0 ? odd.toFixed(2) : '-'}</strong></span>
+            <span class="text-slate-400 text-xs">Apostado: <strong class="text-slate-200 font-bold">${formatCurrency(riskAmount)}</strong></span>
             <div class="mx-0.5">${statusBadge}</div>
-            <span class="text-xs min-w-[75px] text-right ${profitBadgeClass}">${profitSign}${formatCurrency(profit)}</span>
+            <span class="text-sm font-bold min-w-[85px] text-right tabular-nums ${profitBadgeClass}">${profitSign}${formatCurrency(profit)}</span>
           </div>
         </div>
       `;
@@ -2735,17 +2761,17 @@ function renderHistoryBetsHtml(betsList, displayDate, itemWageredText, itemRetur
   }).join('');
 
   return `
-    <div class="bg-slate-900/70 rounded-xl p-3.5 border border-slate-800/80 space-y-2.5">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-bold text-slate-300 border-b border-slate-800/80 pb-2">
-        <span class="flex items-center gap-1.5 text-indigo-400">
+    <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800/80 space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm font-bold text-slate-300 border-b border-slate-800/80 pb-2.5">
+        <span class="flex items-center gap-2 text-blue-400">
           <i data-lucide="list" class="w-4 h-4"></i>
           Apostas do Dia em ${displayDate} (${sessionsCount} ${sessionsCount === 1 ? 'aposta' : 'apostas'}):
         </span>
-        <span class="text-[11px] text-slate-400 font-normal">
-          Apostado: <strong class="text-slate-200">${itemWageredText}</strong> | Retorno: <strong class="${(itemDateReturn >= itemDateWagered) ? 'text-emerald-400' : 'text-rose-400'}">${itemReturnText}</strong>
+        <span class="text-xs text-slate-400 font-normal">
+          Apostado: <strong class="text-slate-200">${itemWageredText}</strong> | Retorno: <strong class="${(itemDateReturn > itemDateWagered) ? 'text-emerald-400 font-bold' : (itemDateReturn === 0 ? 'text-slate-300 font-medium' : 'text-slate-200 font-medium')}">${itemReturnText}</strong>
         </span>
       </div>
-      <div class="space-y-1.5">${itemsHtml}</div>
+      <div class="space-y-2">${itemsHtml}</div>
     </div>
   `;
 }
@@ -2872,14 +2898,14 @@ function renderHistory() {
     if (bankStatMonthProfit) {
       bankStatMonthProfit.textContent = (dateProfit >= 0 ? '+' : '') + formatCurrency(dateProfit);
       if (dateProfit > 0) {
-        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-emerald-400';
-        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400';
+        bankStatMonthProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-emerald-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400 shrink-0';
       } else if (dateProfit < 0) {
-        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-rose-400';
-        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400';
+        bankStatMonthProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-rose-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400 shrink-0';
       } else {
-        bankStatMonthProfit.className = 'text-2xl font-bold tracking-tight text-indigo-400';
-        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-indigo-900/60 rounded-lg text-indigo-400';
+        bankStatMonthProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-blue-400';
+        if (bankMonthProfitIconBg) bankMonthProfitIconBg.className = 'p-2 bg-blue-900/60 rounded-lg text-blue-400 shrink-0';
       }
     }
 
@@ -2904,14 +2930,14 @@ function renderHistory() {
     if (bankStatDaysProfit) {
       bankStatDaysProfit.textContent = (totalRealProfit >= 0 ? '+' : '') + formatCurrency(totalRealProfit);
       if (totalRealProfit > 0) {
-        bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-emerald-400';
-        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400';
+        bankStatDaysProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-emerald-400';
+        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-emerald-950/80 rounded-lg text-emerald-400 shrink-0';
       } else if (totalRealProfit < 0) {
-        bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-rose-400';
-        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400';
+        bankStatDaysProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-rose-400';
+        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-rose-950/80 rounded-lg text-rose-400 shrink-0';
       } else {
-        bankStatDaysProfit.className = 'text-2xl font-bold tracking-tight text-slate-100';
-        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-slate-900/60 rounded-lg text-indigo-400';
+        bankStatDaysProfit.className = 'text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-slate-100';
+        if (bankDaysProfitIconBg) bankDaysProfitIconBg.className = 'p-2 bg-slate-900/60 rounded-lg text-blue-400 shrink-0';
       }
     }
 
@@ -2922,7 +2948,7 @@ function renderHistory() {
     if (bankStatVolume) bankStatVolume.textContent = formatCurrency(dateWagered);
     if (bankStatReturnSub) {
       bankStatReturnSub.textContent = `Retorno: ${formatCurrency(dateReturn)}`;
-      bankStatReturnSub.className = dateReturn >= dateWagered ? 'text-xs text-emerald-400 mt-1 font-semibold' : 'text-xs text-rose-400 mt-1 font-semibold';
+      bankStatReturnSub.className = dateReturn >= dateWagered ? 'text-xs text-emerald-400 mt-1.5 font-semibold' : 'text-xs text-rose-400 mt-1.5 font-semibold';
     }
 
     const tbody = document.getElementById('history-table-body');
@@ -2936,23 +2962,35 @@ function renderHistory() {
     historyList.forEach(tx => {
       const amountVal = parseFloat(tx.amount || 0);
       const isPositive = amountVal >= 0;
-      const icon = isPositive ? '🟢' : '🔴';
       const descText = (tx.description && tx.description.trim())
         ? tx.description.trim()
         : (isPositive ? 'Depósito / Aporte no Banco' : 'Retirada do Banco');
+
+      const iconDot = isPositive
+        ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-500/20 shrink-0"></span>'
+        : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-400 ring-2 ring-rose-500/20 shrink-0"></span>';
+
+      const txIcon = isPositive ? 'arrow-down-left' : 'arrow-up-right';
+      const txColor = isPositive ? 'text-emerald-400' : 'text-rose-400';
 
       ledgerItems.push({
         id: tx.id,
         timestamp: tx.timestamp || new Date().toISOString(),
         category: 'manual',
         typeLabel: `
-          <div class="flex items-center gap-1.5 font-semibold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}">
-            <span class="text-xs shrink-0">${icon}</span>
-            <span class="truncate">${descText}</span>
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 flex items-center justify-center shrink-0">
+              ${iconDot}
+            </div>
+            <span class="flex items-center gap-2 font-semibold text-sm ${txColor}">
+              <i data-lucide="${txIcon}" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate text-sm text-slate-200 font-medium">${escapeHTML(descText)}</span>
+              <span class="text-[11px] px-1.5 py-0.5 rounded font-semibold ${isPositive ? 'bg-emerald-950/60 border border-emerald-500/20 text-emerald-400' : 'bg-rose-950/60 border border-rose-500/20 text-rose-400'}">${isPositive ? 'Aporte' : 'Retirada'}</span>
+            </span>
           </div>
         `,
-        wageredText: '-',
-        returnText: '-',
+        wageredText: '<span class="inline-block text-slate-600 font-semibold select-none pr-3">—</span>',
+        returnText: '<span class="inline-block text-slate-600 font-semibold select-none pr-3">—</span>',
         resultText: isPositive ? `+${formatCurrency(amountVal)}` : formatCurrency(amountVal),
         amountClass: isPositive ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold',
         isDeletable: true,
@@ -2982,9 +3020,9 @@ function renderHistory() {
       let statusBadgeHtml = '';
       if (hasPending) {
         if (day.pendingCount && day.pendingCount < day.betsCount) {
-          statusBadgeHtml = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 border border-amber-500/30 text-amber-400 font-bold">${day.pendingCount} de ${day.betsCount} EM ANDAMENTO</span>`;
+          statusBadgeHtml = `<span class="text-xs px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-500/30 text-amber-300 font-semibold">${day.pendingCount} de ${day.betsCount} EM ANDAMENTO</span>`;
         } else {
-          statusBadgeHtml = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-bold">EM ANDAMENTO</span>`;
+          statusBadgeHtml = `<span class="text-xs px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 font-semibold">EM ANDAMENTO</span>`;
         }
       }
 
@@ -2992,7 +3030,7 @@ function renderHistory() {
       if (hasPending && day.resolvedCount === 0) {
         returnText = 'Em andamento';
       } else if (hasPending && day.resolvedCount > 0) {
-        returnText = `${formatCurrency(day.dateReturn)} <span class="text-[10px] text-amber-400 font-semibold">(parcial)</span>`;
+        returnText = `${formatCurrency(day.dateReturn)} <span class="text-xs text-amber-400 font-semibold">(parcial)</span>`;
       } else {
         returnText = formatCurrency(day.dateReturn);
       }
@@ -3003,12 +3041,12 @@ function renderHistory() {
         category: 'day',
         typeLabel: `
           <div class="flex items-center gap-2">
-            <button type="button" class="btn-toggle-history-day text-slate-400 group-hover:text-indigo-400 transition-transform duration-200 p-0.5 rounded hover:bg-slate-800" data-date="${day.dateKey}">
-              <i data-lucide="chevron-right" class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-indigo-400' : ''}"></i>
+            <button type="button" class="btn-toggle-history-day text-slate-400 hover:text-blue-400 transition-colors p-1 rounded-md hover:bg-slate-800 shrink-0" data-date="${day.dateKey}">
+              <i data-lucide="chevron-right" class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-400' : ''}"></i>
             </button>
-            <span class="flex items-center gap-1.5 font-semibold ${day.isDayActive ? 'text-emerald-400' : 'text-indigo-400'}">
-              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-              Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'})
+            <span class="flex items-center gap-2 font-semibold text-sm ${day.isDayActive ? 'text-emerald-400' : 'text-blue-400'}">
+              <i data-lucide="calendar" class="w-4 h-4 shrink-0"></i>
+              <span>Sessão Diária (${day.betsCount} ${day.betsCount === 1 ? 'aposta' : 'apostas'})</span>
               ${statusBadgeHtml}
             </span>
           </div>
@@ -3070,25 +3108,27 @@ function renderHistory() {
       const isDayItem = item.category === 'day';
       const isExpanded = isDayItem && expandedHistoryDates.has(item.dateKey);
 
-      tr.className = `hover:bg-slate-900/30 transition-colors border-b border-slate-900/40 ${isDayItem ? 'cursor-pointer group' : ''}`;
+      tr.className = `hover:bg-slate-800/30 transition-colors border-b border-slate-800/60 ${isDayItem ? 'cursor-pointer group' : ''}`;
       if (isDayItem) tr.dataset.dateKey = item.dateKey;
 
       const displayDate = item.formattedDate || formatDateTime(item.timestamp);
       const endBal = runningBalances[item.id] !== undefined ? formatCurrency(runningBalances[item.id]) : '-';
 
       tr.innerHTML = `
-        <td class="py-3.5 pl-2 text-xs text-slate-300 font-medium whitespace-nowrap">${displayDate}</td>
-        <td class="py-3.5 text-xs">${item.typeLabel}</td>
-        <td class="py-3.5 text-right text-xs text-slate-400 font-medium">${item.wageredText}</td>
-        <td class="py-3.5 text-right text-xs text-slate-400 font-medium">${item.returnText}</td>
-        <td class="py-3.5 text-right text-xs ${item.amountClass}">${item.resultText}</td>
-        <td class="py-3.5 text-right text-xs font-bold text-slate-200">${endBal}</td>
-        <td class="py-3.5 text-right pr-2">
-          ${item.isDeletable ? `
-            <button class="btn-delete-tx text-slate-500 hover:text-rose-400 p-1 hover:bg-slate-900 rounded-lg transition-colors" data-tx-id="${item.id}" title="Desfazer Lançamento Manual">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
-            </button>
-          ` : `<span class="text-[10px] text-slate-600 font-semibold">Sessão</span>`}
+        <td class="py-4 pl-3 text-sm text-slate-300 font-medium whitespace-nowrap">${displayDate}</td>
+        <td class="py-4 px-3 text-sm">${item.typeLabel}</td>
+        <td class="py-4 px-3 text-right text-sm text-slate-400 font-medium tabular-nums">${item.wageredText}</td>
+        <td class="py-4 px-3 text-right text-sm text-slate-400 font-medium tabular-nums">${item.returnText}</td>
+        <td class="py-4 px-3 text-right text-sm font-bold tabular-nums ${item.amountClass}">${item.resultText}</td>
+        <td class="py-4 px-3 text-right text-sm font-bold text-slate-100 tabular-nums">${endBal}</td>
+        <td class="py-4 px-3 text-center w-24">
+          <div class="flex items-center justify-center">
+            ${item.isDeletable ? `
+              <button class="btn-delete-tx text-slate-400 hover:text-rose-400 p-1.5 hover:bg-slate-800 rounded-lg transition-colors inline-flex items-center justify-center" data-tx-id="${escapeHTML(item.id)}" title="Desfazer Lançamento Manual">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
+              </button>
+            ` : `<span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-semibold text-slate-400 bg-slate-800/60 border border-slate-700/60">Sessão</span>`}
+          </div>
         </td>
       `;
 
@@ -3141,7 +3181,7 @@ function renderHistory() {
       renderHistory();
     });
 
-    if (window.lucide) window.lucide.createIcons({ root: tbody });
+    if (window.lucide) window.lucide.createIcons();
   } catch (err) {
     console.error('Erro em renderHistory:', err);
   }
@@ -3422,13 +3462,13 @@ function renderBetsSummary() {
 
     tr.innerHTML = `
       <td class="py-4 pl-3 text-xs font-bold text-slate-100 flex items-center gap-2">
-        <button type="button" class="btn-toggle-summary-day text-slate-400 group-hover:text-indigo-400 transition-transform duration-200 p-0.5 rounded hover:bg-slate-800" data-date="${dateKey}">
-          <i data-lucide="chevron-right" class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-indigo-400' : ''}"></i>
+        <button type="button" class="btn-toggle-summary-day text-slate-400 group-hover:text-blue-400 transition-transform duration-200 p-0.5 rounded hover:bg-slate-800" data-date="${dateKey}">
+          <i data-lucide="chevron-right" class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-400' : ''}"></i>
         </button>
-        <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i>
+        <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
         <span>${formattedDate}</span>
       </td>
-      <td class="py-4 text-xs text-slate-400 truncate max-w-[240px]" title="${notesJoined}">${notesJoined}</td>
+      <td class="py-4 text-xs text-slate-400 truncate max-w-[240px]" title="${escapeHTML(notesJoined)}">${escapeHTML(notesJoined)}</td>
       <td class="py-4 text-right text-xs font-semibold text-slate-200">${formatCurrency(totalStaked)}</td>
       <td class="py-4 text-right text-xs ${returnColorClass}">${formatCurrency(totalReturn)}</td>
       <td class="py-4 text-right pr-3 text-xs">
@@ -3480,8 +3520,8 @@ function renderBetsSummary() {
       sessionsHTML += `
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 bg-slate-900/70 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-colors">
           <div class="flex items-center gap-2">
-            <i data-lucide="tag" class="w-3.5 h-3.5 text-indigo-400"></i>
-            <span class="text-xs font-bold text-slate-200">${sessTitle}</span>
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span class="text-xs font-bold text-slate-200">${escapeHTML(sessTitle)}</span>
           </div>
           <div class="flex flex-wrap items-center gap-4 text-xs">
             <span class="text-slate-400">Apostado: <strong class="text-slate-200">${formatCurrency(sessStaked)}</strong></span>
@@ -3496,7 +3536,7 @@ function renderBetsSummary() {
       <td colspan="5" class="py-3 px-4 sm:px-6">
         <div class="space-y-2">
           <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-blue-400"></i>
             Sessões Registradas em ${formattedDate} (${group.sessions.length}):
           </div>
           <div class="space-y-2">
@@ -3561,7 +3601,7 @@ function renderBetsSummary() {
     if (grandNetProfit > 0) {
       summaryNetProfitEl.className = 'text-2xl font-bold tracking-tight text-emerald-400';
       if (summaryNetProfitCard) {
-        summaryNetProfitCard.className = 'glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-green';
+        summaryNetProfitCard.className = 'glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-green';
       }
       if (summaryNetProfitIconContainer) {
         summaryNetProfitIconContainer.className = 'p-2 bg-emerald-500/10 rounded-lg text-emerald-400';
@@ -3569,7 +3609,7 @@ function renderBetsSummary() {
     } else if (grandNetProfit < 0) {
       summaryNetProfitEl.className = 'text-2xl font-bold tracking-tight text-rose-400';
       if (summaryNetProfitCard) {
-        summaryNetProfitCard.className = 'glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-red';
+        summaryNetProfitCard.className = 'glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-red';
       }
       if (summaryNetProfitIconContainer) {
         summaryNetProfitIconContainer.className = 'p-2 bg-slate-900/60 rounded-lg text-rose-400';
@@ -3577,10 +3617,10 @@ function renderBetsSummary() {
     } else {
       summaryNetProfitEl.className = 'text-2xl font-bold tracking-tight text-slate-100';
       if (summaryNetProfitCard) {
-        summaryNetProfitCard.className = 'glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-neutral';
+        summaryNetProfitCard.className = 'glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between transition-all duration-300 glow-neutral';
       }
       if (summaryNetProfitIconContainer) {
-        summaryNetProfitIconContainer.className = 'p-2 bg-slate-900/60 rounded-lg text-indigo-400';
+        summaryNetProfitIconContainer.className = 'p-2 bg-slate-900/60 rounded-lg text-blue-400';
       }
     }
   }
@@ -4221,7 +4261,7 @@ function deactivateAllTabs() {
   if (contentGoals) contentGoals.classList.add('hidden');
 }
 
-const activeTabClass = "px-4 md:px-5 py-3 text-xs md:text-sm font-bold border-b-2 border-indigo-500 text-indigo-400 -mb-px transition-colors flex items-center gap-2 shrink-0";
+const activeTabClass = "px-4 md:px-5 py-3 text-xs md:text-sm font-bold border-b-2 border-blue-500 text-blue-400 -mb-px transition-colors flex items-center gap-2 shrink-0";
 
 function activateDashboardTab() {
   deactivateAllTabs();
@@ -4351,12 +4391,12 @@ function renderCalcEntries() {
       <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 bg-slate-900/60 rounded-xl border ${entry.isLocked ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-800/80'} items-center relative transition-all">
         <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Casa / Seleção ${index + 1}</label>
-          <input type="text" data-entry-field="house" data-entry-index="${index}" value="${entry.house || ''}" placeholder="${housePlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
+          <input type="text" data-entry-field="house" data-entry-index="${index}" value="${entry.house || ''}" placeholder="${housePlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:border-blue-500 focus:outline-none">
         </div>
 
         <div class="sm:col-span-2">
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Odd Aposta ${index + 1}</label>
-          <input type="number" step="0.01" min="1.01" data-entry-field="odd" data-entry-index="${index}" value="${entry.odd || ''}" placeholder="${oddPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-indigo-500 focus:outline-none">
+          <input type="number" step="0.01" min="1.01" data-entry-field="odd" data-entry-index="${index}" value="${entry.odd || ''}" placeholder="${oddPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:border-blue-500 focus:outline-none">
         </div>
 
         <div class="${isRemoveable ? 'sm:col-span-3' : 'sm:col-span-3'}">
@@ -4367,12 +4407,12 @@ function renderCalcEntries() {
               <span>${entry.isLocked ? 'Trancada' : 'Fixar'}</span>
             </button>
           </div>
-          <input type="number" step="0.01" min="0" id="calc-stake-display-${index}" data-entry-field="calculatedStake" data-entry-index="${index}" value="${stakeValueDisplay}" placeholder="Ex: 50.00" class="w-full bg-slate-950 border ${entry.isLocked ? 'border-amber-500/60 ring-1 ring-amber-500/30' : 'border-slate-800'} rounded-lg px-3 py-2 text-xs text-indigo-300 font-bold focus:border-indigo-500 focus:outline-none transition-all">
+          <input type="number" step="0.01" min="0" id="calc-stake-display-${index}" data-entry-field="calculatedStake" data-entry-index="${index}" value="${stakeValueDisplay}" placeholder="Ex: 50.00" class="w-full bg-slate-950 border ${entry.isLocked ? 'border-amber-500/60 ring-1 ring-amber-500/30' : 'border-slate-800'} rounded-lg px-3 py-2 text-xs text-blue-300 font-bold focus:border-blue-500 focus:outline-none transition-all">
         </div>
 
         <div class="sm:col-span-2">
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Saldo</label>
-          <select data-entry-field="type" data-entry-index="${index}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-indigo-500 focus:outline-none">
+          <select data-entry-field="type" data-entry-index="${index}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-200 font-medium focus:border-blue-500 focus:outline-none">
             <option value="real" ${entry.type === 'real' ? 'selected' : ''}>Saldo Real</option>
             <option value="freebet_snr" ${entry.type === 'freebet_snr' ? 'selected' : ''}>Freebet SNR</option>
             <option value="freebet_sr" ${entry.type === 'freebet_sr' ? 'selected' : ''}>Freebet SR</option>
@@ -4381,7 +4421,7 @@ function renderCalcEntries() {
 
         <div class="${isRemoveable ? 'sm:col-span-1' : 'sm:col-span-2'}">
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Comissão</label>
-          <input type="number" step="0.5" min="0" max="100" data-entry-field="comm" data-entry-index="${index}" value="${entry.comm || ''}" placeholder="${commPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-300 font-medium focus:border-indigo-500 focus:outline-none">
+          <input type="number" step="0.5" min="0" max="100" data-entry-field="comm" data-entry-index="${index}" value="${entry.comm || ''}" placeholder="${commPlaceholder}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-slate-300 font-medium focus:border-blue-500 focus:outline-none">
         </div>
 
         ${isRemoveable ? `
@@ -4518,7 +4558,7 @@ function initBetTrackerCalculator() {
       modeButtons.forEach(b => {
         if (!b.btn) return;
         if (b.mode === item.mode) {
-          b.btn.className = "calc-mode-btn px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-md transition-all flex items-center gap-1.5 shrink-0";
+          b.btn.className = "calc-mode-btn px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white shadow-sm transition-colors flex items-center gap-1.5 shrink-0";
         } else {
           b.btn.className = "calc-mode-btn px-3.5 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-1.5 shrink-0";
         }
@@ -4604,16 +4644,16 @@ function initBetTrackerCalculator() {
   if (btnTargetNew && btnTargetExisting) {
     btnTargetNew.addEventListener('click', () => {
       calcState.exportMode = 'new';
-      btnTargetNew.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
-      btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+      btnTargetNew.className = "px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white border border-blue-500 transition-all flex items-center justify-center gap-1.5 shadow-sm";
+      btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-lg hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
       if (containerNew) containerNew.classList.remove('hidden');
       if (containerExisting) containerExisting.classList.add('hidden');
     });
 
     btnTargetExisting.addEventListener('click', () => {
       calcState.exportMode = 'existing';
-      btnTargetExisting.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
-      btnTargetNew.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+      btnTargetExisting.className = "px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white border border-blue-500 transition-all flex items-center justify-center gap-1.5 shadow-sm";
+      btnTargetNew.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-lg hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
       if (containerExisting) containerExisting.classList.remove('hidden');
       if (containerNew) containerNew.classList.add('hidden');
     });
@@ -4835,7 +4875,7 @@ function calculateBetTracker() {
     if (calcState.mode === 'freebet') {
       const freebetRetention = (minNetProfit / (finalStakes[0] || 1)) * 100;
       badgeSurebet.textContent = `Extração Freebet: ${freebetRetention.toFixed(1)}%`;
-      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+      badgeSurebet.className = "px-2.5 py-1 text-[10px] font-semibold uppercase rounded-full bg-blue-950/60 text-blue-300 border border-blue-800/60";
     } else if (isPositive) {
       badgeSurebet.textContent = "Surebet Positiva";
       badgeSurebet.className = "px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
@@ -4859,7 +4899,7 @@ function calculateBetTracker() {
   if (tbody) {
     tbody.innerHTML = scenarios.map(sc => `
       <tr class="hover:bg-slate-900/40 transition-colors">
-        <td class="py-3 px-3 font-semibold text-slate-200">${sc.name}</td>
+        <td class="py-3 px-3 font-semibold text-slate-200">${escapeHTML(sc.name)}</td>
         <td class="py-3 px-3 text-slate-300 font-medium">R$ ${sc.stake.toFixed(2).replace('.', ',')}</td>
         <td class="py-3 px-3 text-emerald-400 font-bold">R$ ${sc.grossReturn.toFixed(2).replace('.', ',')}</td>
         <td class="py-3 px-3 font-extrabold ${sc.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
@@ -4892,8 +4932,8 @@ function openExportCalcModal() {
   const containerExisting = document.getElementById('calc-export-container-existing');
 
   if (btnTargetNew && btnTargetExisting) {
-    btnTargetNew.className = "px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white border border-indigo-500 transition-all flex items-center justify-center gap-1.5";
-    btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-xl hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
+    btnTargetNew.className = "px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white border border-blue-500 transition-all flex items-center justify-center gap-1.5 shadow-sm";
+    btnTargetExisting.className = "px-3 py-2 text-xs font-medium text-slate-400 bg-slate-900 border border-slate-800 rounded-lg hover:text-slate-200 transition-all flex items-center justify-center gap-1.5";
     if (containerNew) containerNew.classList.remove('hidden');
     if (containerExisting) containerExisting.classList.add('hidden');
   }
@@ -4913,7 +4953,7 @@ function openExportCalcModal() {
       let optionsHtml = trackerData.days.map(d => {
         const notesText = d.notes ? ` (${d.notes})` : '';
         const dateText = formatDate(d.date);
-        return `<option value="${d.id}">${dateText}${notesText}</option>`;
+        return `<option value="${escapeHTML(d.id)}">${escapeHTML(dateText)}${escapeHTML(notesText)}</option>`;
       }).join('');
       dateSelect.innerHTML = optionsHtml;
     }
@@ -4928,8 +4968,8 @@ function openExportCalcModal() {
 
     return `
       <div class="flex items-center justify-between py-1.5 border-b border-slate-800/80 text-xs">
-        <span>${idx + 1}. <strong>${houseName}</strong> @ ${oddVal.toFixed(2)} (${isFreebet ? 'Freebet' : 'Saldo Real'})</span>
-        <span class="font-bold text-indigo-300">R$ ${stakeVal.toFixed(2).replace('.', ',')}</span>
+        <span>${idx + 1}. <strong>${escapeHTML(houseName)}</strong> @ ${oddVal.toFixed(2)} (${isFreebet ? 'Freebet' : 'Saldo Real'})</span>
+        <span class="font-bold text-blue-300">R$ ${stakeVal.toFixed(2).replace('.', ',')}</span>
       </div>
     `;
   }).join('');
@@ -5141,7 +5181,7 @@ function renderFreebetDays(filterQuery = '') {
       });
 
       const dayCard = document.createElement('div');
-      dayCard.className = 'glass-card rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
+      dayCard.className = 'glass-card rounded-xl border border-slate-800 overflow-hidden shadow-lg transition-all duration-200 animate-slide-down';
       dayCard.setAttribute('data-freebet-date-key', dateKey);
 
       const formattedDate = formatDate(dateKey);
@@ -5168,16 +5208,16 @@ function renderFreebetDays(filterQuery = '') {
         rowsHtml += `
           <tr class="border-b border-slate-800/60 text-xs text-slate-300 hover:bg-slate-900/40 transition-colors">
             <td class="py-2.5 px-3 font-semibold text-slate-200">
-              ${bet.bookmaker || 'Não informada'}
+              ${escapeHTML(bet.bookmaker || 'Não informada')}
             </td>
             <td class="py-2.5 px-3 uppercase text-[10px] font-bold">
-              <span class="px-2 py-0.5 rounded ${isLay ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}">
+              <span class="px-2 py-0.5 rounded ${isLay ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}">
                 ${isLay ? 'LAY' : 'BACK'}
               </span>
             </td>
-            <td class="py-2.5 px-3 font-semibold text-indigo-400">
+            <td class="py-2.5 px-3 font-semibold text-blue-400">
               ${formatCurrency(bet.stake || 0)}
-              ${bet.freebet ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30">Freebet</span>` : ''}
+              ${bet.freebet ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30">Freebet</span>` : ''}
             </td>
             <td class="py-2.5 px-3 font-mono">
               ${bet.odd ? bet.odd.toFixed(2) : '1.00'}
@@ -5206,21 +5246,21 @@ function renderFreebetDays(filterQuery = '') {
             </button>
 
             <span class="text-sm font-bold text-slate-100 flex items-center gap-1.5 shrink-0">
-              <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i>
+              <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
               ${formattedDate}
             </span>
 
-            <span class="text-xs px-2.5 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full font-bold shrink-0">
+            <span class="text-xs px-2.5 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full font-bold shrink-0">
               ${dateFreebetCount} ${dateFreebetCount === 1 ? 'freebet' : 'freebets'}
             </span>
 
-            ${combinedNotes ? `<span class="text-xs text-slate-400 italic truncate max-w-[200px] sm:max-w-[320px]" title="${combinedNotes}">"${combinedNotes}"</span>` : ''}
+            ${combinedNotes ? `<span class="text-xs text-slate-400 italic truncate max-w-[200px] sm:max-w-[320px]" title="${escapeHTML(combinedNotes)}">"${escapeHTML(combinedNotes)}"</span>` : ''}
           </div>
 
           <div class="flex items-center gap-4 text-xs shrink-0 self-end sm:self-auto">
             <div class="flex items-center gap-1.5">
               <span class="text-slate-450">Freebet Total:</span>
-              <span class="font-bold text-indigo-400 bg-indigo-950/40 px-2.5 py-1 rounded-lg border border-indigo-500/30">${formatCurrency(dateFreebetStake)}</span>
+              <span class="font-bold text-blue-400 bg-blue-950/40 px-2.5 py-1 rounded-lg border border-blue-500/30">${formatCurrency(dateFreebetStake)}</span>
             </div>
             <div class="flex items-center gap-1.5">
               <span class="text-slate-450">Lucro Freebet:</span>
@@ -5410,16 +5450,16 @@ if (dropZone && inputImportFile) {
   
   dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('border-indigo-500', 'bg-indigo-950/10');
+    dropZone.classList.add('border-blue-500', 'bg-indigo-950/10');
   });
   
   dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/10');
+    dropZone.classList.remove('border-blue-500', 'bg-indigo-950/10');
   });
   
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/10');
+    dropZone.classList.remove('border-blue-500', 'bg-indigo-950/10');
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
@@ -5531,7 +5571,7 @@ function showImportPreview(daysCount, betsCount, globalBalance) {
   if (previewDiv && previewDays && previewBets && previewBalance) {
     previewDays.innerHTML = `Dias de apostas: <strong class="text-white">${daysCount}</strong>`;
     previewBets.innerHTML = `Total de apostas: <strong class="text-white">${betsCount}</strong>`;
-    previewBalance.innerHTML = `Banca consolidada: <strong class="text-indigo-400 font-bold">${formatCurrency(globalBalance)}</strong>`;
+    previewBalance.innerHTML = `Banca consolidada: <strong class="text-blue-400 font-bold">${formatCurrency(globalBalance)}</strong>`;
     
     previewDiv.classList.remove('hidden');
   }
@@ -5645,7 +5685,7 @@ function clearNoteForm() {
   setDefaultNoteDate();
 
   if (noteFormTitle) {
-    noteFormTitle.innerHTML = `<i data-lucide="pen-tool" class="w-5 h-5 text-indigo-400"></i> Nova Anotação Diária`;
+    noteFormTitle.innerHTML = `<i data-lucide="pen-tool" class="w-5 h-5 text-blue-400"></i> Nova Anotação Diária`;
   }
   if (btnSaveNoteText) btnSaveNoteText.textContent = 'Salvar Anotação';
   if (btnCancelNoteEdit) btnCancelNoteEdit.classList.add('hidden');
@@ -5697,28 +5737,28 @@ function renderDailyNotes(filterQuery = '') {
 
   filteredNotes.forEach(note => {
     const card = document.createElement('div');
-    card.className = "glass-card rounded-2xl p-5 border border-slate-800 space-y-4 hover:border-slate-700 transition-all duration-200 animate-slide-down";
+    card.className = "glass-card rounded-xl p-5 border border-slate-800 space-y-4 hover:border-slate-700 transition-all duration-200 animate-slide-down";
 
     const displayTitle = note.title && note.title.trim() ? note.title.trim() : null;
     const formattedDateStr = formatDate(note.date);
-    const escapedContent = (note.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').trim();
+    const escapedContent = escapeHTML(note.content || '').trim();
 
     card.innerHTML = `
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div class="flex flex-wrap items-center gap-3">
-          <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold text-xs rounded-xl">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-xs rounded-xl">
             <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
             <span>${formattedDateStr}</span>
           </div>
-          ${displayTitle ? `<span class="text-sm font-semibold text-slate-100">${displayTitle}</span>` : ''}
+          ${displayTitle ? `<span class="text-sm font-semibold text-slate-100">${escapeHTML(displayTitle)}</span>` : ''}
         </div>
 
         <div class="flex items-center gap-2 self-end sm:self-auto">
-          <button type="button" class="btn-edit-note bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-95 flex items-center gap-1.5" data-note-id="${note.id}">
-            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <button type="button" class="btn-edit-note bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-95 flex items-center gap-1.5" data-note-id="${escapeHTML(note.id)}">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-blue-400"></i>
             Editar
           </button>
-          <button type="button" class="btn-delete-note bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-95 flex items-center gap-1.5" data-note-id="${note.id}">
+          <button type="button" class="btn-delete-note bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-95 flex items-center gap-1.5" data-note-id="${escapeHTML(note.id)}">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             Excluir
           </button>
@@ -5795,7 +5835,7 @@ if (notesListContainer) {
         noteContentInput.value = note.content || '';
 
         if (noteFormTitle) {
-          noteFormTitle.innerHTML = `<i data-lucide="edit-3" class="w-5 h-5 text-indigo-400"></i> Editar Anotação Diária`;
+          noteFormTitle.innerHTML = `<i data-lucide="edit-3" class="w-5 h-5 text-blue-400"></i> Editar Anotação Diária`;
         }
         if (btnSaveNoteText) btnSaveNoteText.textContent = 'Atualizar Anotação';
         if (btnCancelNoteEdit) btnCancelNoteEdit.classList.remove('hidden');
@@ -5980,8 +6020,8 @@ async function handleChangePassword(event) {
     showProfilePasswordAlert('Preencha todos os campos de senha.');
     return;
   }
-  if (newPassword.length < 6) {
-    showProfilePasswordAlert('A nova senha precisa ter no mínimo 6 caracteres.');
+  if (newPassword.length < 8) {
+    showProfilePasswordAlert('A nova senha precisa ter no mínimo 8 caracteres.');
     return;
   }
   if (newPassword !== confirmation) {
@@ -6038,7 +6078,7 @@ function switchAuthMode(mode) {
 
   if (mode === 'login') {
     if (tabLogin) {
-      tabLogin.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-indigo-600 text-white shadow-md';
+      tabLogin.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-blue-600 text-white shadow-sm';
     }
     if (tabRegister) {
       tabRegister.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200';
@@ -6049,7 +6089,7 @@ function switchAuthMode(mode) {
     if (passwordHint) passwordHint.classList.add('hidden');
   } else {
     if (tabRegister) {
-      tabRegister.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-indigo-600 text-white shadow-md';
+      tabRegister.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-blue-600 text-white shadow-sm';
     }
     if (tabLogin) {
       tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200';
@@ -6083,10 +6123,10 @@ function showAuthAlert(message, type = 'error') {
       alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-emerald-400';
     }
   } else {
-    alertContainer.className = 'mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-indigo-950/50 border-indigo-500/30 text-indigo-300';
+    alertContainer.className = 'mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-blue-950/50 border-blue-500/30 text-blue-300';
     if (alertIcon) {
       alertIcon.setAttribute('data-lucide', 'info');
-      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-indigo-400';
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-blue-400';
     }
   }
 
@@ -6132,8 +6172,8 @@ function translateAuthError(error) {
   if (msg.includes('User already registered') || msg.includes('user_already_exists')) {
     return 'Este e-mail já está cadastrado. Alterne para a aba "Entrar" e faça login.';
   }
-  if (msg.includes('Password should be at least 6 characters')) {
-    return 'A senha precisa ter no mínimo 6 caracteres.';
+  if (msg.includes('Password should be at least') || msg.includes('at least 6 characters') || msg.includes('at least 8 characters')) {
+    return 'A senha precisa ter no mínimo 8 caracteres.';
   }
   if (msg.toLowerCase().includes('invalid password') || msg.toLowerCase().includes('current password')) {
     return 'A senha atual está incorreta.';
@@ -6166,8 +6206,8 @@ async function handleAuthSubmit(e) {
     return;
   }
 
-  if (password.length < 6) {
-    showAuthAlert('A senha deve conter no mínimo 6 caracteres.', 'error');
+  if (password.length < 8) {
+    showAuthAlert('A senha deve conter no mínimo 8 caracteres.', 'error');
     return;
   }
 
