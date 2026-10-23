@@ -19,13 +19,15 @@ function escapeHTML(str) {
     .replace(/`/g, '&#x60;');
 }
 
-// Carregamento dinâmico e seguro de credenciais (sem expor segredos hardcoded no repositório)
-// Ordem de precedência: window.__CONFIG__ (config.js) -> window.__ENV__ -> localStorage
+// Carregamento dinâmico e seguro de credenciais
+// Ordem de precedência: window.__CONFIG__ (config.js) -> window.__ENV__ -> localStorage -> credenciais do projeto
 const SUPABASE_URL = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_URL || window.__ENV__?.SUPABASE_URL))
-  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_URL') || '') : '');
+  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_URL') || '') : '')
+  || 'https://lakilyuxnvxexkmophkl.supabase.co';
 
 const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_ANON_KEY))
-  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_ANON_KEY') || '') : '');
+  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_ANON_KEY') || '') : '')
+  || 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
 
 let supabaseClient = null;
 if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -6720,6 +6722,18 @@ async function initAuthFlow() {
       isPasswordRecoveryMode = true;
       setTimeout(() => {
         openResetPasswordModal();
+      }, 300);
+    } else if (initialHash && (initialHash.includes('error=') || initialHash.includes('error_code='))) {
+      // Captura erros de link expirado ou já utilizado vindos pelo e-mail do Supabase
+      setTimeout(() => {
+        if (initialHash.includes('otp_expired') || initialHash.includes('expired')) {
+          showAuthAlert('O link de recuperação de senha expirou ou já foi utilizado. Solicite um novo link clicando em "Esqueceu a senha?".', 'error');
+        } else {
+          showAuthAlert('O link de acesso é inválido ou expirou. Por favor, tente novamente.', 'error');
+        }
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
       }, 300);
     }
 
