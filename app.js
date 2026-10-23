@@ -6073,6 +6073,7 @@ function switchAuthMode(mode) {
   const togglePrompt = document.getElementById('auth-toggle-prompt');
   const btnToggleMode = document.getElementById('btn-auth-toggle-mode');
   const passwordHint = document.getElementById('auth-password-hint');
+  const btnForgotPassword = document.getElementById('btn-forgot-password');
 
   hideAuthAlert();
 
@@ -6087,6 +6088,7 @@ function switchAuthMode(mode) {
     if (togglePrompt) togglePrompt.textContent = 'Não tem uma conta?';
     if (btnToggleMode) btnToggleMode.textContent = 'Criar Conta';
     if (passwordHint) passwordHint.classList.add('hidden');
+    if (btnForgotPassword) btnForgotPassword.classList.remove('hidden');
   } else {
     if (tabRegister) {
       tabRegister.className = 'py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 bg-blue-600 text-white shadow-sm';
@@ -6098,6 +6100,7 @@ function switchAuthMode(mode) {
     if (togglePrompt) togglePrompt.textContent = 'Já possui uma conta?';
     if (btnToggleMode) btnToggleMode.textContent = 'Fazer Login';
     if (passwordHint) passwordHint.classList.remove('hidden');
+    if (btnForgotPassword) btnForgotPassword.classList.add('hidden');
   }
 }
 
@@ -6184,8 +6187,305 @@ function translateAuthError(error) {
   if (msg.includes('Signup requires a valid password')) {
     return 'A senha informada é inválida.';
   }
+  if (msg.includes('For security purposes') || msg.includes('once every')) {
+    return 'Por segurança, aguarde alguns instantes antes de solicitar um novo e-mail de recuperação.';
+  }
+  if (msg.includes('Email rate limit exceeded')) {
+    return 'Limite de envio de e-mails atingido temporariamente. Aguarde alguns minutos e tente novamente.';
+  }
+  if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid token')) {
+    return 'O link de recuperação expirou ou é inválido. Por favor, solicite um novo link.';
+  }
+  if (msg.includes('New password should be different')) {
+    return 'A nova senha deve ser diferente da senha anterior.';
+  }
 
   return msg;
+}
+
+// ==========================================
+// PASSWORD RECOVERY & RESET FLOW (SUPABASE)
+// ==========================================
+
+let isPasswordRecoveryMode = false;
+
+function openForgotPasswordModal() {
+  const modal = document.getElementById('modal-forgot-password');
+  const authEmailInput = document.getElementById('auth-email');
+  const forgotEmailInput = document.getElementById('forgot-email');
+  hideForgotAlert();
+
+  if (forgotEmailInput && authEmailInput && authEmailInput.value.trim()) {
+    forgotEmailInput.value = authEmailInput.value.trim();
+  }
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons({ root: modal });
+  }
+
+  setTimeout(() => {
+    if (forgotEmailInput) forgotEmailInput.focus();
+  }, 100);
+}
+
+function closeForgotPasswordModal() {
+  const modal = document.getElementById('modal-forgot-password');
+  if (modal) modal.classList.add('hidden');
+  hideForgotAlert();
+  setForgotLoading(false);
+}
+
+function showForgotAlert(message, type = 'error') {
+  const alertContainer = document.getElementById('forgot-alert');
+  const alertIcon = document.getElementById('forgot-alert-icon');
+  const alertMsg = document.getElementById('forgot-alert-msg');
+  if (!alertContainer || !alertMsg) return;
+
+  alertContainer.classList.remove('hidden');
+  alertMsg.textContent = message;
+
+  if (type === 'error') {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-rose-950/50 border-rose-500/30 text-rose-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'alert-circle');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-rose-400';
+    }
+  } else if (type === 'success') {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-emerald-950/50 border-emerald-500/30 text-emerald-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'check-circle-2');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-emerald-400';
+    }
+  } else {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-blue-950/50 border-blue-500/30 text-blue-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'info');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-blue-400';
+    }
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons({ root: alertContainer });
+  }
+}
+
+function hideForgotAlert() {
+  const alertContainer = document.getElementById('forgot-alert');
+  if (alertContainer) alertContainer.classList.add('hidden');
+}
+
+function setForgotLoading(isLoading) {
+  const btnSubmit = document.getElementById('btn-submit-forgot');
+  const spinner = document.getElementById('forgot-btn-spinner');
+  const btnText = document.getElementById('forgot-btn-text');
+  const emailInput = document.getElementById('forgot-email');
+
+  if (btnSubmit) btnSubmit.disabled = isLoading;
+  if (emailInput) emailInput.disabled = isLoading;
+  if (spinner) {
+    if (isLoading) spinner.classList.remove('hidden');
+    else spinner.classList.add('hidden');
+  }
+  if (btnText) {
+    btnText.textContent = isLoading ? 'Enviando link...' : 'Enviar Link';
+  }
+}
+
+async function handleForgotPasswordSubmit(e) {
+  e.preventDefault();
+  if (!supabaseClient) {
+    showForgotAlert('Supabase não inicializado. Verifique suas credenciais em config.js.', 'error');
+    return;
+  }
+
+  const emailInput = document.getElementById('forgot-email');
+  const email = emailInput ? emailInput.value.trim() : '';
+
+  if (!email) {
+    showForgotAlert('Por favor, informe seu e-mail cadastrado.', 'error');
+    return;
+  }
+
+  setForgotLoading(true);
+  hideForgotAlert();
+
+  try {
+    // Redireciona de volta para a mesma página com o token seguro
+    const redirectTo = window.location.origin + window.location.pathname;
+
+    const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo
+    });
+
+    if (error) {
+      showForgotAlert(translateAuthError(error), 'error');
+    } else {
+      showForgotAlert('Link de recuperação enviado com sucesso! Verifique a sua caixa de entrada e spam.', 'success');
+      if (emailInput) emailInput.value = '';
+    }
+  } catch (err) {
+    console.error('Erro ao solicitar recuperação de senha:', err);
+    showForgotAlert('Falha de conexão com o Supabase. Tente novamente.', 'error');
+  } finally {
+    setForgotLoading(false);
+  }
+}
+
+function openResetPasswordModal() {
+  isPasswordRecoveryMode = true;
+  const modal = document.getElementById('modal-reset-password');
+  const newPass = document.getElementById('reset-new-password');
+  const confirmPass = document.getElementById('reset-confirm-password');
+
+  if (newPass) newPass.value = '';
+  if (confirmPass) confirmPass.value = '';
+  hideResetAlert();
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons({ root: modal });
+  }
+
+  setTimeout(() => {
+    if (newPass) newPass.focus();
+  }, 100);
+}
+
+function closeResetPasswordModal() {
+  isPasswordRecoveryMode = false;
+  const modal = document.getElementById('modal-reset-password');
+  if (modal) modal.classList.add('hidden');
+  hideResetAlert();
+  setResetLoading(false);
+
+  // Limpa o hash da URL
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+function showResetAlert(message, type = 'error') {
+  const alertContainer = document.getElementById('reset-alert');
+  const alertIcon = document.getElementById('reset-alert-icon');
+  const alertMsg = document.getElementById('reset-alert-msg');
+  if (!alertContainer || !alertMsg) return;
+
+  alertContainer.classList.remove('hidden');
+  alertMsg.textContent = message;
+
+  if (type === 'error') {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-rose-950/50 border-rose-500/30 text-rose-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'alert-circle');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-rose-400';
+    }
+  } else if (type === 'success') {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-emerald-950/50 border-emerald-500/30 text-emerald-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'check-circle-2');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-emerald-400';
+    }
+  } else {
+    alertContainer.className = 'mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all bg-blue-950/50 border-blue-500/30 text-blue-300';
+    if (alertIcon) {
+      alertIcon.setAttribute('data-lucide', 'info');
+      alertIcon.className = 'w-4 h-4 mt-0.5 shrink-0 text-blue-400';
+    }
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons({ root: alertContainer });
+  }
+}
+
+function hideResetAlert() {
+  const alertContainer = document.getElementById('reset-alert');
+  if (alertContainer) alertContainer.classList.add('hidden');
+}
+
+function setResetLoading(isLoading) {
+  const btnSubmit = document.getElementById('btn-submit-reset');
+  const spinner = document.getElementById('reset-btn-spinner');
+  const btnText = document.getElementById('reset-btn-text');
+  const newPass = document.getElementById('reset-new-password');
+  const confirmPass = document.getElementById('reset-confirm-password');
+
+  if (btnSubmit) btnSubmit.disabled = isLoading;
+  if (newPass) newPass.disabled = isLoading;
+  if (confirmPass) confirmPass.disabled = isLoading;
+  if (spinner) {
+    if (isLoading) spinner.classList.remove('hidden');
+    else spinner.classList.add('hidden');
+  }
+  if (btnText) {
+    btnText.textContent = isLoading ? 'Salvando nova senha...' : 'Salvar Nova Senha';
+  }
+}
+
+async function handleResetPasswordSubmit(e) {
+  e.preventDefault();
+  if (!supabaseClient) {
+    showResetAlert('Supabase não inicializado.', 'error');
+    return;
+  }
+
+  const newPassInput = document.getElementById('reset-new-password');
+  const confirmPassInput = document.getElementById('reset-confirm-password');
+  const newPassword = newPassInput ? newPassInput.value : '';
+  const confirmPassword = confirmPassInput ? confirmPassInput.value : '';
+
+  if (!newPassword || !confirmPassword) {
+    showResetAlert('Preencha os dois campos de senha.', 'error');
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    showResetAlert('A senha deve conter pelo menos 8 caracteres.', 'error');
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showResetAlert('As duas senhas informadas não coincidem.', 'error');
+    return;
+  }
+
+  setResetLoading(true);
+  hideResetAlert();
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      showResetAlert(translateAuthError(error), 'error');
+    } else {
+      showResetAlert('Senha atualizada com sucesso! Acessando sua conta...', 'success');
+
+      if (newPassInput) newPassInput.value = '';
+      if (confirmPassInput) confirmPassInput.value = '';
+
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+
+      setTimeout(async () => {
+        closeResetPasswordModal();
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          await updateAppForSession(session);
+        } catch (_) {
+          window.location.reload();
+        }
+      }, 1500);
+    }
+  } catch (err) {
+    console.error('Erro ao redefinir senha:', err);
+    showResetAlert('Ocorreu uma falha ao redefinir sua senha. Tente novamente.', 'error');
+  } finally {
+    setResetLoading(false);
+  }
 }
 
 async function handleAuthSubmit(e) {
@@ -6278,6 +6578,11 @@ async function updateAppForSession(session) {
   const userBadge = document.getElementById('user-badge');
 
   if (session && session.user) {
+    // Se o usuário está redefinindo a senha vindo pelo link do e-mail, aguarda concluir
+    if (isPasswordRecoveryMode) {
+      return;
+    }
+
     // Exibe a aplicação e esconde o login
     if (authContainer) authContainer.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
@@ -6327,6 +6632,15 @@ async function initAuthFlow() {
   const profileNameForm = document.getElementById('form-profile-name');
   const changePasswordForm = document.getElementById('form-change-password');
 
+  // Esqueci minha senha e Redefinição
+  const btnForgotPassword = document.getElementById('btn-forgot-password');
+  const btnModalForgotClose = document.getElementById('modal-forgot-close');
+  const btnCancelForgot = document.getElementById('btn-cancel-forgot');
+  const formForgotPassword = document.getElementById('form-forgot-password');
+  const btnToggleResetPass = document.getElementById('btn-toggle-reset-password');
+  const btnCancelReset = document.getElementById('btn-cancel-reset');
+  const formResetPassword = document.getElementById('form-reset-password');
+
   if (tabLogin) tabLogin.addEventListener('click', () => switchAuthMode('login'));
   if (tabRegister) tabRegister.addEventListener('click', () => switchAuthMode('register'));
   if (btnToggleMode) {
@@ -6358,6 +6672,40 @@ async function initAuthFlow() {
   if (profileNameForm) profileNameForm.addEventListener('submit', handleProfileNameUpdate);
   if (changePasswordForm) changePasswordForm.addEventListener('submit', handleChangePassword);
 
+  // Listeners para Esqueci Minha Senha
+  if (btnForgotPassword) btnForgotPassword.addEventListener('click', openForgotPasswordModal);
+  if (btnModalForgotClose) btnModalForgotClose.addEventListener('click', closeForgotPasswordModal);
+  if (btnCancelForgot) btnCancelForgot.addEventListener('click', closeForgotPasswordModal);
+  if (formForgotPassword) formForgotPassword.addEventListener('submit', handleForgotPasswordSubmit);
+
+  // Listeners para Redefinição de Nova Senha
+  if (btnToggleResetPass) {
+    btnToggleResetPass.addEventListener('click', () => {
+      const input = document.getElementById('reset-new-password');
+      if (!input) return;
+      const isPass = input.type === 'password';
+      input.type = isPass ? 'text' : 'password';
+      btnToggleResetPass.innerHTML = `<i data-lucide="${isPass ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
+      if (window.lucide) window.lucide.createIcons({ root: btnToggleResetPass });
+    });
+  }
+
+  if (btnCancelReset) {
+    btnCancelReset.addEventListener('click', async () => {
+      closeResetPasswordModal();
+      if (supabaseClient) {
+        try {
+          await supabaseClient.auth.signOut();
+        } catch (_) {}
+      }
+      updateAppForSession(null);
+    });
+  }
+
+  if (formResetPassword) {
+    formResetPassword.addEventListener('submit', handleResetPasswordSubmit);
+  }
+
   // Verificar sessão atual
   if (!supabaseClient) {
     console.warn('Supabase não disponível.');
@@ -6366,12 +6714,30 @@ async function initAuthFlow() {
   }
 
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    await updateAppForSession(session);
+    // Detecta se a página foi aberta com parâmetros de recuperação de senha no hash (#type=recovery ou access_token)
+    const initialHash = window.location.hash;
+    if (initialHash && (initialHash.includes('type=recovery') || initialHash.includes('access_token='))) {
+      isPasswordRecoveryMode = true;
+      setTimeout(() => {
+        openResetPasswordModal();
+      }, 300);
+    }
 
-    // Escutar eventos de sessão (SIGN_IN, SIGN_OUT, TOKEN_REFRESHED)
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!isPasswordRecoveryMode) {
+      await updateAppForSession(session);
+    }
+
+    // Escutar eventos de sessão (SIGN_IN, SIGN_OUT, TOKEN_REFRESHED, PASSWORD_RECOVERY)
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
       console.log('Evento Supabase Auth:', event);
+      if (event === 'PASSWORD_RECOVERY') {
+        openResetPasswordModal();
+        return;
+      }
+      if (isPasswordRecoveryMode) {
+        return;
+      }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         await updateAppForSession(session);
       } else if (event === 'SIGNED_OUT') {

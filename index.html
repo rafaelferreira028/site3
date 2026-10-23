@@ -108,7 +108,12 @@
         <div>
           <div class="flex items-center justify-between mb-1.5">
             <label for="auth-password" class="block text-xs font-semibold text-slate-300">Senha</label>
-            <span id="auth-password-hint" class="text-[10px] text-slate-500 hidden">Mínimo 8 caracteres</span>
+            <div class="flex items-center gap-2">
+              <span id="auth-password-hint" class="text-[10px] text-slate-500 hidden">Mínimo 8 caracteres</span>
+              <button type="button" id="btn-forgot-password" class="text-xs text-blue-400 hover:text-blue-300 hover:underline">
+                Esqueceu a senha?
+              </button>
+            </div>
           </div>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -140,6 +145,127 @@
           Criar Conta
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Esqueci Minha Senha (Solicitar envio de link por e-mail) -->
+  <div id="modal-forgot-password" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden" role="dialog" aria-modal="true" aria-labelledby="modal-forgot-title">
+    <div class="glass-panel w-full max-w-md rounded-xl border border-slate-800 shadow-2xl p-6 sm:p-7 overflow-hidden animate-slide-down relative">
+      <button id="modal-forgot-close" type="button" class="absolute top-5 right-5 text-slate-400 hover:text-slate-200 p-1.5 hover:bg-slate-900 rounded-lg transition-colors" aria-label="Fechar">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-5 pr-8">
+        <div class="p-2.5 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+          <i data-lucide="key-round" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 id="modal-forgot-title" class="text-lg font-bold text-slate-100 font-heading">Recuperar Senha</h4>
+          <p class="text-xs text-slate-400 mt-0.5">Enviaremos um link de redefinição para o seu e-mail</p>
+        </div>
+      </div>
+
+      <!-- Alert Box -->
+      <div id="forgot-alert" class="hidden mb-4 p-3.5 rounded-lg text-xs flex items-start gap-2.5 border transition-all">
+        <i id="forgot-alert-icon" data-lucide="alert-circle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+        <span id="forgot-alert-msg" class="leading-relaxed font-medium"></span>
+      </div>
+
+      <form id="form-forgot-password" class="space-y-4">
+        <div>
+          <label for="forgot-email" class="block text-xs font-semibold text-slate-300 mb-1.5">E-mail Cadastrado</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <i data-lucide="mail" class="w-4 h-4"></i>
+            </div>
+            <input type="email" id="forgot-email" required placeholder="seu@email.com"
+              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1.5">
+            Insira o endereço de e-mail associado à sua conta.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="button" id="btn-cancel-forgot"
+            class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            Voltar
+          </button>
+          <button type="submit" id="btn-submit-forgot"
+            class="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors active:scale-95 flex items-center justify-center gap-2">
+            <span id="forgot-btn-spinner" class="hidden">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+            </span>
+            <span id="forgot-btn-text">Enviar Link</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Redefinir Nova Senha (após o clique no link recebido por e-mail) -->
+  <div id="modal-reset-password" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden" role="dialog" aria-modal="true" aria-labelledby="modal-reset-title">
+    <div class="glass-panel w-full max-w-md rounded-xl border border-slate-800 shadow-2xl p-6 sm:p-7 overflow-hidden animate-slide-down">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="p-2.5 bg-emerald-600/20 text-emerald-400 rounded-xl border border-emerald-500/20 shrink-0">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 id="modal-reset-title" class="text-lg font-bold text-slate-100 font-heading">Criar Nova Senha</h4>
+          <p class="text-xs text-slate-400 mt-0.5">Defina sua nova credencial segura para acesso</p>
+        </div>
+      </div>
+
+      <!-- Alert Box -->
+      <div id="reset-alert" class="hidden mb-4 p-3.5 rounded-lg text-xs flex items-start gap-2.5 border transition-all">
+        <i id="reset-alert-icon" data-lucide="alert-circle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+        <span id="reset-alert-msg" class="leading-relaxed font-medium"></span>
+      </div>
+
+      <form id="form-reset-password" class="space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="reset-new-password" class="block text-xs font-semibold text-slate-300">Nova Senha</label>
+            <span class="text-[10px] text-slate-500">Mínimo 8 caracteres</span>
+          </div>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </div>
+            <input type="password" id="reset-new-password" required minlength="8" placeholder="••••••••"
+              class="w-full pl-10 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+            <button type="button" id="btn-toggle-reset-password"
+              class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label for="reset-confirm-password" class="block text-xs font-semibold text-slate-300 mb-1.5">Confirmar Nova Senha</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </div>
+            <input type="password" id="reset-confirm-password" required minlength="8" placeholder="••••••••"
+              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="button" id="btn-cancel-reset"
+            class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" id="btn-submit-reset"
+            class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors active:scale-95 flex items-center justify-center gap-2">
+            <span id="reset-btn-spinner" class="hidden">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+            </span>
+            <span id="reset-btn-text">Salvar Nova Senha</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
