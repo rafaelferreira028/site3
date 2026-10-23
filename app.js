@@ -30,13 +30,26 @@ const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && (window.__CONFIG__?.
   || 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
 
 let supabaseClient = null;
-if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_URL && SUPABASE_ANON_KEY) {
+function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+  const sb = (typeof window !== 'undefined' && window.supabase) || (typeof supabase !== 'undefined' ? supabase : null);
+  if (!sb || typeof sb.createClient !== 'function') {
+    return null;
+  }
+  const url = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_URL || window.__ENV__?.SUPABASE_URL))
+    || 'https://lakilyuxnvxexkmophkl.supabase.co';
+  const key = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_ANON_KEY))
+    || 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
+
   try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = sb.createClient(url, key);
+    return supabaseClient;
   } catch (err) {
     console.error('Falha ao inicializar o cliente Supabase:', err);
+    return null;
   }
 }
+supabaseClient = getSupabaseClient();
 
 let trackerData = { days: [], dailyNotes: [] };
 let globalBalance = 0;
@@ -6297,7 +6310,10 @@ function setForgotLoading(isLoading) {
 async function handleForgotPasswordSubmit(e) {
   e.preventDefault();
   if (!supabaseClient) {
-    showForgotAlert('Supabase não inicializado. Verifique suas credenciais em config.js.', 'error');
+    supabaseClient = getSupabaseClient();
+  }
+  if (!supabaseClient) {
+    showForgotAlert('Supabase não inicializado. Verifique a conexão com a internet.', 'error');
     return;
   }
 
