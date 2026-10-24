@@ -20,29 +20,25 @@ function escapeHTML(str) {
 }
 
 // Carregamento dinâmico e seguro de credenciais
-// Ordem de precedência: window.__CONFIG__ (config.js) -> window.__ENV__ -> localStorage -> credenciais do projeto
+// Ordem de precedência: window.__CONFIG__ (config.js) -> window.__ENV__ -> credenciais do projeto
 const SUPABASE_URL = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_URL || window.__ENV__?.SUPABASE_URL))
-  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_URL') || '') : '')
   || 'https://lakilyuxnvxexkmophkl.supabase.co';
 
 const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_ANON_KEY))
-  || (typeof localStorage !== 'undefined' ? (localStorage.getItem('PG_SUPABASE_ANON_KEY') || '') : '')
   || 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
 
+let currentSession = null;
 let supabaseClient = null;
+
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient;
   const sb = (typeof window !== 'undefined' && window.supabase) || (typeof supabase !== 'undefined' ? supabase : null);
   if (!sb || typeof sb.createClient !== 'function') {
     return null;
   }
-  const url = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_URL || window.__ENV__?.SUPABASE_URL))
-    || 'https://lakilyuxnvxexkmophkl.supabase.co';
-  const key = (typeof window !== 'undefined' && (window.__CONFIG__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_ANON_KEY))
-    || 'sb_publishable_GKkPy4bq09hBeEpcsMuTfA_SX9EYOhm';
 
   try {
-    supabaseClient = sb.createClient(url, key);
+    supabaseClient = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     return supabaseClient;
   } catch (err) {
     console.error('Falha ao inicializar o cliente Supabase:', err);
@@ -93,18 +89,24 @@ function showSyncIndicator(state, message) {
   }
 }
 
-// Local cache helpers as secondary backup
-function loadLocalFallback() {
+// Local cache helpers isolados por usuário como backup secundário
+function getLocalCacheKey(prefix, userId) {
+  const uid = userId || currentSession?.user?.id;
+  return uid ? `${prefix}_${uid}` : prefix;
+}
+
+function loadLocalFallback(userId) {
   try {
-    const stored = localStorage.getItem('sports_betting_tracker_data');
+    const key = getLocalCacheKey('sports_betting_tracker_data', userId);
+    const stored = localStorage.getItem(key) || (!userId && !currentSession ? localStorage.getItem('sports_betting_tracker_data') : null);
     if (stored) trackerData = JSON.parse(stored);
     ensureTrackerDataShape();
 
+    const balKey = getLocalCacheKey('planilhagulosa_global_balance', userId);
+    globalBalance = parseFloat(localStorage.getItem(balKey)) || 0;
 
-
-    globalBalance = parseFloat(localStorage.getItem('planilhagulosa_global_balance')) || 0;
-
-    const histStored = localStorage.getItem('planilhagulosa_balance_history');
+    const histKey = getLocalCacheKey('planilhagulosa_balance_history', userId);
+    const histStored = localStorage.getItem(histKey);
     if (histStored) balanceHistory = JSON.parse(histStored);
     if (!Array.isArray(balanceHistory)) balanceHistory = [];
   } catch (e) {
@@ -114,11 +116,28 @@ function loadLocalFallback() {
   }
 }
 
-function saveLocalFallback() {
+function saveLocalFallback(userId) {
   try {
-    localStorage.setItem('sports_betting_tracker_data', JSON.stringify(trackerData));
-    localStorage.setItem('planilhagulosa_global_balance', globalBalance.toString());
-    localStorage.setItem('planilhagulosa_balance_history', JSON.stringify(balanceHistory));
+    const key = getLocalCacheKey('sports_betting_tracker_data', userId);
+    localStorage.setItem(key, JSON.stringify(trackerData));
+    const balKey = getLocalCacheKey('planilhagulosa_global_balance', userId);
+    localStorage.setItem(balKey, globalBalance.toString());
+    const histKey = getLocalCacheKey('planilhagulosa_balance_history', userId);
+    localStorage.setItem(histKey, JSON.stringify(balanceHistory));
+  } catch (e) {}
+}
+
+function clearLocalFallback() {
+  try {
+    const uid = currentSession?.user?.id;
+    if (uid) {
+      localStorage.removeItem(`sports_betting_tracker_data_${uid}`);
+      localStorage.removeItem(`planilhagulosa_global_balance_${uid}`);
+      localStorage.removeItem(`planilhagulosa_balance_history_${uid}`);
+    }
+    localStorage.removeItem('sports_betting_tracker_data');
+    localStorage.removeItem('planilhagulosa_global_balance');
+    localStorage.removeItem('planilhagulosa_balance_history');
   } catch (e) {}
 }
 
@@ -138,7 +157,6 @@ async function loadData() {
     const user = userData?.user;
 
     if (!user) {
-      console.warn('Nenhum usuário logado no Supabase. Usando cache local.');
       loadLocalFallback();
       showSyncIndicator('error', 'Não autenticado');
       return;
@@ -164,7 +182,7 @@ async function loadData() {
 
     if (error) {
       console.error('Erro ao ler tabela app_state no Supabase:', error);
-      loadLocalFallback();
+      loadLocalFallback(user.id);
       showSyncIndicator('error', 'Erro na leitura da nuvem');
       return;
     }
@@ -188,14 +206,13 @@ async function loadData() {
       }
       if (!Array.isArray(balanceHistory)) balanceHistory = [];
 
-      saveLocalFallback();
+      saveLocalFallback(user.id);
       showSyncIndicator('synced', 'Supabase Conectado');
     } else {
-      console.log(`Nenhum registro encontrado em app_state para user_id=${user.id}. Criando novo estado...`);
       trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
       globalBalance = 0;
       balanceHistory = [];
-      saveLocalFallback();
+      saveLocalFallback(user.id);
       await saveDataImmediate();
     }
   } catch (err) {
@@ -270,44 +287,54 @@ function debouncedSaveData() {
   saveData();
 }
 
-// Subscribe to Supabase Realtime changes for cross-device sync
-function initRealtimeSync() {
-  if (!supabaseClient) return;
+// Subscribe to Supabase Realtime changes for cross-device sync (isolado por usuário)
+let realtimeChannel = null;
+
+function stopRealtimeSync() {
+  if (supabaseClient && realtimeChannel) {
+    try {
+      supabaseClient.removeChannel(realtimeChannel);
+    } catch (_) {}
+    realtimeChannel = null;
+  }
+}
+
+function initRealtimeSync(userId) {
+  const uid = userId || currentSession?.user?.id;
+  if (!supabaseClient || !uid) return;
+
+  stopRealtimeSync();
 
   try {
-    supabaseClient
-      .channel('app_state_changes')
+    realtimeChannel = supabaseClient
+      .channel(`app_state_${uid}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'app_state' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'app_state',
+          filter: `user_id=eq.${uid}`
+        },
         (payload) => {
-          handleRealtimeUpdate(payload);
+          handleRealtimeUpdate(payload, uid);
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Sincronização em tempo real ativada com sucesso!');
-        }
-      });
+      .subscribe();
   } catch (e) {
     console.error('Erro ao inicializar Realtime:', e);
   }
 }
 
-async function handleRealtimeUpdate(payload) {
+async function handleRealtimeUpdate(payload, currentUserId) {
   const newRow = payload.new;
   if (!newRow) return;
 
-  // Filtrar atualizações em tempo real pelo user.id do usuário atual
-  let currentUser = null;
-  if (supabaseClient) {
-    const { data: userData } = await supabaseClient.auth.getUser();
-    currentUser = userData?.user;
-  }
-  if (!currentUser) return;
+  const uid = currentUserId || currentSession?.user?.id;
+  if (!uid) return;
 
-  const isUserRow = (newRow.user_id && newRow.user_id === currentUser.id) ||
-                    (newRow.id && String(newRow.id) === String(currentUser.id));
+  const isUserRow = (newRow.user_id && newRow.user_id === uid) ||
+                    (newRow.id && String(newRow.id) === String(uid));
   if (!isUserRow) return;
 
   let updated = false;
@@ -344,7 +371,7 @@ async function handleRealtimeUpdate(payload) {
   }
 
   if (updated) {
-    saveLocalFallback();
+    saveLocalFallback(uid);
     renderAllDays(document.getElementById('input-search-days')?.value || '');
     updateGlobalCapital();
     renderHistory();
@@ -5932,7 +5959,6 @@ function toggleMobileMenu() {
 // SUPABASE AUTHENTICATION MODULE (LOGIN & REGISTRO)
 // ==========================================
 
-let currentSession = null;
 let currentAuthMode = 'login'; // 'login' ou 'register'
 
 function getProfileName(user) {
@@ -6574,6 +6600,7 @@ async function handleAuthSubmit(e) {
 }
 
 async function handleLogout() {
+  stopRealtimeSync();
   if (supabaseClient) {
     try {
       showSyncIndicator('loading', 'Saindo...');
@@ -6582,6 +6609,7 @@ async function handleLogout() {
       console.error('Erro ao fazer logout:', e);
     }
   }
+  clearLocalFallback();
   trackerData = { days: [], dailyNotes: [], goal: { amount: 0, startDate: '' } };
   globalBalance = 0;
   balanceHistory = [];
@@ -6617,7 +6645,7 @@ async function updateAppForSession(session) {
     if (!appLoaded) {
       appLoaded = true;
       await loadData();
-      initRealtimeSync();
+      initRealtimeSync(session.user.id);
       renderAllDays();
       updateGlobalCapital();
       setDefaultNoteDate();
@@ -6626,6 +6654,7 @@ async function updateAppForSession(session) {
     }
   } else {
     // Esconde a aplicação e mostra a tela de login
+    stopRealtimeSync();
     appLoaded = false;
     if (appContainer) appContainer.classList.add('hidden');
     if (authContainer) authContainer.classList.remove('hidden');
@@ -6760,7 +6789,6 @@ async function initAuthFlow() {
 
     // Escutar eventos de sessão (SIGN_IN, SIGN_OUT, TOKEN_REFRESHED, PASSWORD_RECOVERY)
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
-      console.log('Evento Supabase Auth:', event);
       if (event === 'PASSWORD_RECOVERY') {
         openResetPasswordModal();
         return;
